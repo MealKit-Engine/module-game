@@ -3,6 +3,7 @@
 #include "mealkit/core/Reflect.h"
 #include "mealkit/core/Types.h"
 #include "mealkit/game/GameContext.h"
+#include "mealkit/game/SimDebug.h"
 #include "mealkit/render/Renderer.h"
 
 #include <string>
@@ -23,7 +24,7 @@ struct Scene;
 namespace mealkit::game {
 
 // DLL 경계의 약속이 바뀌면 올린다. 에디터는 번호가 다른 게임 DLL을 불러오지 않는다.
-inline constexpr u32 kApiVersion = 5; // 2: GameContext, 3: 게임 오브젝트 종류, 4: 튜닝, 5: 상태 보기
+inline constexpr u32 kApiVersion = 6; // 2: GameContext, 3: 게임 오브젝트 종류, 4: 튜닝, 5: 상태 보기, 6: 디버그 제어
 
 struct PlayOptions {
     bool bot = false;       // 스크립트 입력 (자동 테스트)
@@ -32,6 +33,8 @@ struct PlayOptions {
     bool capture = false;
     u32 physicsThreads = 0; // 0 = 자동
     std::string tuningPath; // 비어 있으면 assets/game.tuning (에디터는 저장 안 된 값을 임시 파일로 넘긴다)
+    bool shadow = false;    // 그림자 시뮬레이션: World를 하나 더 돌려 매 틱 비교 (에디터, 시뮬레이션 CPU 2배)
+    bool record = false;    // 입력 기록 + 스냅샷: 일시정지, 한 틱 진행, 되감기 (에디터 혼자 플레이)
 };
 
 // 한 판: 결정론 시뮬레이션 실행, 로컬 입력, 카메라, 그리기.
@@ -58,6 +61,8 @@ public:
     virtual void setTuning(const void* tuning) = 0;
     // 시뮬레이션 상태 (에디터 [상태] 패널, 읽기 전용). 다음 update까지 유효하다.
     virtual reflect::View stateView() const = 0;
+    // 일시정지·되감기·그림자 시뮬레이션 (game::Simulation이 구현한다). 없으면 nullptr.
+    virtual SimDebug* debug() { return nullptr; }
 };
 
 // 게임 DLL이 내보내는 정보. 에디터가 mealkitGetGameModule()로 받는다.
