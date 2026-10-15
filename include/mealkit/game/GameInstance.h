@@ -1,5 +1,6 @@
 #pragma once
 
+#include "mealkit/core/Reflect.h"
 #include "mealkit/core/Types.h"
 #include "mealkit/game/GameContext.h"
 #include "mealkit/render/Renderer.h"
@@ -19,7 +20,7 @@ struct Scene;
 namespace mealkit::game {
 
 // DLL 경계의 약속이 바뀌면 올린다. 에디터는 번호가 다른 게임 DLL을 불러오지 않는다.
-inline constexpr u32 kApiVersion = 2; // 2: GameContext
+inline constexpr u32 kApiVersion = 3; // 2: GameContext, 3: 게임 오브젝트 종류
 
 struct PlayOptions {
     bool bot = false;       // 스크립트 입력 (자동 테스트)
@@ -56,6 +57,8 @@ struct GameModule {
     const char* name = "";
     GameInstance* (*create)() = nullptr;  // 에디터가 플레이를 누를 때
     void (*destroy)(GameInstance*) = nullptr; // DLL 안에서 지운다 (같은 힙)
+    // 게임이 MEALKIT_OBJECT로 선언한 씬 오브젝트 종류 (에디터 [추가] 메뉴, 인스펙터). DLL을 내리면 무효가 된다.
+    const std::vector<const reflect::TypeInfo*>* (*objectTypes)() = nullptr;
 };
 
 using GetGameModuleFn = const GameModule* (*)();
@@ -69,6 +72,9 @@ inline constexpr const char* kGetGameModuleSymbol = "mealkitGetGameModule";
         static const ::mealkit::game::GameModule module{                                                     \
             ::mealkit::game::kApiVersion, NameLiteral,                                                        \
             []() -> ::mealkit::game::GameInstance* { return new GameClass(); },                              \
-            [](::mealkit::game::GameInstance* g) { delete g; }};                                             \
+            [](::mealkit::game::GameInstance* g) { delete g; },                                              \
+            []() -> const std::vector<const ::mealkit::reflect::TypeInfo*>* {                                \
+                return &::mealkit::reflect::moduleObjectTypes();                                             \
+            }};                                                                                             \
         return &module;                                                                                    \
     }
