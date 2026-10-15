@@ -23,7 +23,7 @@ struct Scene;
 namespace mealkit::game {
 
 // DLL 경계의 약속이 바뀌면 올린다. 에디터는 번호가 다른 게임 DLL을 불러오지 않는다.
-inline constexpr u32 kApiVersion = 4; // 2: GameContext, 3: 게임 오브젝트 종류, 4: 튜닝
+inline constexpr u32 kApiVersion = 5; // 2: GameContext, 3: 게임 오브젝트 종류, 4: 튜닝, 5: 상태 보기
 
 struct PlayOptions {
     bool bot = false;       // 스크립트 입력 (자동 테스트)
@@ -56,6 +56,8 @@ public:
 
     // 튜닝 값을 바로 바꾼다 (에디터 혼자 플레이). tuning은 GameModule::tuningType 타입의 값이다.
     virtual void setTuning(const void* tuning) = 0;
+    // 시뮬레이션 상태 (에디터 [상태] 패널, 읽기 전용). 다음 update까지 유효하다.
+    virtual reflect::View stateView() const = 0;
 };
 
 // 게임 DLL이 내보내는 정보. 에디터가 mealkitGetGameModule()로 받는다.
