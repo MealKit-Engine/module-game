@@ -1,16 +1,10 @@
 #pragma once
 
 #include "mealkit/core/Types.h"
+#include "mealkit/game/GameContext.h"
 #include "mealkit/render/Renderer.h"
 
 namespace mealkit {
-class Window;
-namespace asset {
-class ModelCache;
-}
-namespace net {
-class LockstepSession;
-}
 namespace render {
 class DrawList;
 }
@@ -25,7 +19,7 @@ struct Scene;
 namespace mealkit::game {
 
 // DLL 경계의 약속이 바뀌면 올린다. 에디터는 번호가 다른 게임 DLL을 불러오지 않는다.
-inline constexpr u32 kApiVersion = 1;
+inline constexpr u32 kApiVersion = 2; // 2: GameContext
 
 struct PlayOptions {
     bool bot = false;       // 스크립트 입력 (자동 테스트)
@@ -41,15 +35,12 @@ public:
     virtual ~GameInstance() = default;
 
     // 세션이 Running이 되면 한 번 호출한다.
-    virtual void start(const scene::Scene& scene, const net::LockstepSession& session, const PlayOptions& options,
-                       asset::ModelCache& models) = 0;
+    virtual void start(GameContext& ctx, const scene::Scene& scene, const PlayOptions& options) = 0;
     virtual bool started() const = 0;
     // 매 프레임: 카메라 입력과 시뮬레이션 틱 실행.
-    virtual void update(f64 dt, net::LockstepSession& session, Window& window, bool keyboardAllowed,
-                        bool mouseAllowed) = 0;
-    // 장면을 그릴 데이터를 채운다.
-    virtual void buildFrame(f64 now, u8 localPlayer, render::Viewport viewport, render::FrameParams& frame,
-                            render::DrawList& out) = 0;
+    virtual void update(GameContext& ctx, f64 dt) = 0;
+    // 장면을 그릴 데이터를 채운다 (ctx.viewport 영역, 로컬 플레이어는 ctx.session.localPlayer()).
+    virtual void buildFrame(GameContext& ctx, f64 now, render::FrameParams& frame, render::DrawList& out) = 0;
 
     virtual u32 nextTick() const = 0;
     virtual u64 stateHash() const = 0;
