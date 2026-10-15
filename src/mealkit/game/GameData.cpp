@@ -9,8 +9,8 @@ namespace mealkit::game {
 std::string loadTuning(const reflect::TypeInfo& type, void* data, const std::string& path) {
     const std::string file = path.empty() ? findAsset(kDefaultTuningAsset) : path;
     if (file.empty() || !fileExists(file)) {
-        MEALKIT_WARN("Tuning file %s not found - using the defaults in %s", path.empty() ? kDefaultTuningAsset : path.c_str(),
-                     type.name);
+        MEALKIT_WARN("Tuning file %s not found - using the defaults in %s",
+                     path.empty() ? kDefaultTuningAsset : path.c_str(), type.name);
         return {};
     }
     std::string error;

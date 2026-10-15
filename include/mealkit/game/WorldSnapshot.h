@@ -33,7 +33,8 @@ void saveSnapshot(const World& world, WorldSnapshot& out) {
 template <class World>
 bool loadSnapshot(World& world, const WorldSnapshot& snapshot) {
     reflect::ByteReader r(snapshot.state.data(), snapshot.state.size());
-    if (!reflect::loadStruct(reflect::typeOf<std::remove_cvref_t<decltype(world.state)>>(), &world.state, r) || !r.atEnd())
+    if (!reflect::loadStruct(reflect::typeOf<std::remove_cvref_t<decltype(world.state)>>(), &world.state, r) ||
+        !r.atEnd())
         return false;
     if (!world.physics.restore(snapshot.physics)) return false;
     return world.hash() == snapshot.hash;

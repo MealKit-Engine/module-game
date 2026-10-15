@@ -27,9 +27,9 @@ namespace mealkit::game {
 inline constexpr u32 kApiVersion = 6; // 2: GameContext, 3: 게임 오브젝트 종류, 4: 튜닝, 5: 상태 보기, 6: 디버그 제어
 
 struct PlayOptions {
-    bool bot = false;       // 스크립트 입력 (자동 테스트)
-    u32 exitTick = 0;       // 이 틱을 실행하면 finished() = true
-    u32 captureTick = 0;    // 이 틱을 지나면 captureDue() = true (한 번)
+    bool bot = false;    // 스크립트 입력 (자동 테스트)
+    u32 exitTick = 0;    // 이 틱을 실행하면 finished() = true
+    u32 captureTick = 0; // 이 틱을 지나면 captureDue() = true (한 번)
     bool capture = false;
     u32 physicsThreads = 0; // 0 = 자동
     std::string tuningPath; // 비어 있으면 assets/game.tuning (에디터는 저장 안 된 값을 임시 파일로 넘긴다)
@@ -69,7 +69,7 @@ public:
 struct GameModule {
     u32 apiVersion = kApiVersion;
     const char* name = "";
-    GameInstance* (*create)() = nullptr;  // 에디터가 플레이를 누를 때
+    GameInstance* (*create)() = nullptr;      // 에디터가 플레이를 누를 때
     void (*destroy)(GameInstance*) = nullptr; // DLL 안에서 지운다 (같은 힙)
     // 게임이 MEALKIT_OBJECT로 선언한 씬 오브젝트 종류 (에디터 [추가] 메뉴, 인스펙터). DLL을 내리면 무효가 된다.
     const std::vector<const reflect::TypeInfo*>* (*objectTypes)() = nullptr;
@@ -83,17 +83,18 @@ inline constexpr const char* kGetGameModuleSymbol = "mealkitGetGameModule";
 } // namespace mealkit::game
 
 // 게임 DLL에서 한 번 쓴다: MEALKIT_GAME_MODULE("Sandbox", sandbox::GameSession)
-#define MEALKIT_GAME_MODULE(NameLiteral, GameClass)                                                          \
-    extern "C" __declspec(dllexport) const ::mealkit::game::GameModule* mealkitGetGameModule() {             \
-        static const ::mealkit::game::GameModule module{                                                     \
-            ::mealkit::game::kApiVersion, NameLiteral,                                                        \
-            []() -> ::mealkit::game::GameInstance* { return new GameClass(); },                              \
-            [](::mealkit::game::GameInstance* g) { delete g; },                                              \
-            []() -> const std::vector<const ::mealkit::reflect::TypeInfo*>* {                                \
-                return &::mealkit::reflect::moduleObjectTypes();                                             \
-            },                                                                                              \
-            []() -> const ::mealkit::reflect::TypeInfo* {                                                    \
-                return &::mealkit::reflect::typeOf<typename GameClass::TuningType>();                         \
-            }};                                                                                             \
-        return &module;                                                                                    \
+#define MEALKIT_GAME_MODULE(NameLiteral, GameClass)                                                                    \
+    extern "C" __declspec(dllexport) const ::mealkit::game::GameModule* mealkitGetGameModule() {                       \
+        static const ::mealkit::game::GameModule module{                                                               \
+            ::mealkit::game::kApiVersion,                                                                              \
+            NameLiteral,                                                                                               \
+            []() -> ::mealkit::game::GameInstance* { return new GameClass(); },                                        \
+            [](::mealkit::game::GameInstance* g) { delete g; },                                                        \
+            []() -> const std::vector<const ::mealkit::reflect::TypeInfo*>* {                                          \
+                return &::mealkit::reflect::moduleObjectTypes();                                                       \
+            },                                                                                                         \
+            []() -> const ::mealkit::reflect::TypeInfo* {                                                              \
+                return &::mealkit::reflect::typeOf<typename GameClass::TuningType>();                                  \
+            }};                                                                                                        \
+        return &module;                                                                                                \
     }

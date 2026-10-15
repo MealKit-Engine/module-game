@@ -25,7 +25,7 @@ struct GameContext {
     net::LockstepSession& session;
 
     // 엔진이 매 프레임 정하는 값
-    render::Viewport viewport{};  // 게임 화면 영역 (에디터에서는 씬 뷰)
+    render::Viewport viewport{}; // 게임 화면 영역 (에디터에서는 씬 뷰)
     bool keyboardAllowed = true; // 에디터: 게임 뷰가 키보드를 받을 때만
     bool mouseAllowed = true;
 };

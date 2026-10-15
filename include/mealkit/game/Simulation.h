@@ -100,7 +100,8 @@ public:
         } else {
             m_accumulator += dt;
             int budget = kCatchUpTicks;
-            while (m_accumulator >= m_tickDt && budget-- > 0 && session.canExecute(m_nextTick) && !m_finished && !m_paused) {
+            while (m_accumulator >= m_tickDt && budget-- > 0 && session.canExecute(m_nextTick) && !m_finished &&
+                   !m_paused) {
                 executeTick(session, sample, onTick);
                 m_accumulator -= m_tickDt;
             }
@@ -166,17 +167,22 @@ public:
             if (s.tick <= tick) from = &s;
         if (!loadSnapshot(*m_world, *from)) {
             m_replayError = "틱 " + std::to_string(from->tick) +
-                            " 스냅샷을 복원한 해시가 저장할 때와 다릅니다. 틱을 넘어 남는 값이 MEALKIT_FIELD로 선언되지 않았을 수 있습니다";
-            MEALKIT_ERROR("%s", m_replayError.c_str());
+                            " 스냅샷을 복원한 해시가 저장할 때와 다릅니다. 틱을 넘어 남는 값이 MEALKIT_FIELD로 "
+                            "선언되지 않았을 수 있습니다";
+            MEALKIT_ERROR("Rewind: snapshot of tick %u does not restore to the saved hash (undeclared state?)",
+                          from->tick);
         }
         // 기록된 입력으로 다시 돌리며 기록된 해시와 비교한다
         for (u32 t = from->tick; t < tick; ++t) {
             m_previous = m_world->state;
             m_world->step(m_inputs[t - m_inputBase]);
             if (m_world->hash() != m_hashes[t - m_inputBase] && m_replayError.empty()) {
-                m_replayError = "되감기로 다시 돌린 틱 " + std::to_string(t) +
-                                "의 해시가 기록과 다릅니다. 선언하지 않은 상태(MEALKIT_FIELD 누락)나 결정론 위반이 있습니다";
-                MEALKIT_ERROR("%s", m_replayError.c_str());
+                m_replayError =
+                    "되감기로 다시 돌린 틱 " + std::to_string(t) +
+                    "의 해시가 기록과 다릅니다. 선언하지 않은 상태(MEALKIT_FIELD 누락)나 결정론 위반이 있습니다";
+                MEALKIT_ERROR(
+                    "Rewind: replayed tick %u does not match the recorded hash (undeclared state or nondeterminism)",
+                    t);
             }
         }
         m_previous = m_world->state;
@@ -203,7 +209,8 @@ private:
         onTick(*m_world); // 틱 이벤트는 다음 step()에서 지워지므로 틱마다 바로 화면 쪽으로 옮긴다
 
         session.submitLocalInput(m_nextTick + session.inputDelay(), sample(m_nextTick));
-        if (m_options.capture && !m_captureDone && m_nextTick >= m_options.captureTick) m_captureDue = m_captureDone = true;
+        if (m_options.capture && !m_captureDone && m_nextTick >= m_options.captureTick)
+            m_captureDue = m_captureDone = true;
         const bool last = m_options.exitTick && m_nextTick >= m_options.exitTick;
         ++m_nextTick;
         ++m_simTicks;
@@ -252,7 +259,8 @@ private:
 
     void returnToLive() {
         if (!m_viewingPast) return;
-        if (!loadSnapshot(*m_world, m_live)) MEALKIT_ERROR("Returning to the live tick: state hash differs after restore");
+        if (!loadSnapshot(*m_world, m_live))
+            MEALKIT_ERROR("Returning to the live tick: state hash differs after restore");
         m_previous = m_livePrevious;
         m_viewingPast = false;
         m_live = {};
