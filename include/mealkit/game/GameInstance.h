@@ -5,6 +5,9 @@
 #include "mealkit/game/GameContext.h"
 #include "mealkit/render/Renderer.h"
 
+#include <string>
+#include <vector>
+
 namespace mealkit {
 namespace render {
 class DrawList;
@@ -20,7 +23,7 @@ struct Scene;
 namespace mealkit::game {
 
 // DLL 경계의 약속이 바뀌면 올린다. 에디터는 번호가 다른 게임 DLL을 불러오지 않는다.
-inline constexpr u32 kApiVersion = 3; // 2: GameContext, 3: 게임 오브젝트 종류
+inline constexpr u32 kApiVersion = 4; // 2: GameContext, 3: 게임 오브젝트 종류, 4: 튜닝
 
 struct PlayOptions {
     bool bot = false;       // 스크립트 입력 (자동 테스트)
@@ -28,6 +31,7 @@ struct PlayOptions {
     u32 captureTick = 0;    // 이 틱을 지나면 captureDue() = true (한 번)
     bool capture = false;
     u32 physicsThreads = 0; // 0 = 자동
+    std::string tuningPath; // 비어 있으면 assets/game.tuning (에디터는 저장 안 된 값을 임시 파일로 넘긴다)
 };
 
 // 한 판: 결정론 시뮬레이션 실행, 로컬 입력, 카메라, 그리기.
@@ -49,6 +53,9 @@ public:
     virtual bool finished() const = 0;
     virtual bool captureDue() = 0;
     virtual f64 takeSimMsPerTick() = 0; // 지난 호출 이후 평균
+
+    // 튜닝 값을 바로 바꾼다 (에디터 혼자 플레이). tuning은 GameModule::tuningType 타입의 값이다.
+    virtual void setTuning(const void* tuning) = 0;
 };
 
 // 게임 DLL이 내보내는 정보. 에디터가 mealkitGetGameModule()로 받는다.
@@ -59,6 +66,8 @@ struct GameModule {
     void (*destroy)(GameInstance*) = nullptr; // DLL 안에서 지운다 (같은 힙)
     // 게임이 MEALKIT_OBJECT로 선언한 씬 오브젝트 종류 (에디터 [추가] 메뉴, 인스펙터). DLL을 내리면 무효가 된다.
     const std::vector<const reflect::TypeInfo*>* (*objectTypes)() = nullptr;
+    // 게임 튜닝 구조체 (GameClass::TuningType). 에디터 [튜닝] 패널이 assets/game.tuning을 이 타입으로 편집한다.
+    const reflect::TypeInfo* (*tuningType)() = nullptr;
 };
 
 using GetGameModuleFn = const GameModule* (*)();
@@ -75,6 +84,9 @@ inline constexpr const char* kGetGameModuleSymbol = "mealkitGetGameModule";
             [](::mealkit::game::GameInstance* g) { delete g; },                                              \
             []() -> const std::vector<const ::mealkit::reflect::TypeInfo*>* {                                \
                 return &::mealkit::reflect::moduleObjectTypes();                                             \
+            },                                                                                              \
+            []() -> const ::mealkit::reflect::TypeInfo* {                                                    \
+                return &::mealkit::reflect::typeOf<typename GameClass::TuningType>();                         \
             }};                                                                                             \
         return &module;                                                                                    \
     }
