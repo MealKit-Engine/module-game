@@ -1,9 +1,9 @@
 #pragma once
 
-#include "aster/core/Types.h"
-#include "aster/render/Renderer.h"
+#include "mealkit/core/Types.h"
+#include "mealkit/render/Renderer.h"
 
-namespace aster {
+namespace mealkit {
 class Window;
 namespace asset {
 class ModelCache;
@@ -17,12 +17,12 @@ class DrawList;
 namespace scene {
 struct Scene;
 }
-} // namespace aster
+} // namespace mealkit
 
 // 엔진(게임 실행 파일, 범용 에디터)과 게임 코드 사이의 경계.
-// 게임은 GameInstance를 구현하고, 에디터용 게임 DLL은 ASTER_GAME_MODULE로 만드는 함수를 내보낸다.
+// 게임은 GameInstance를 구현하고, 에디터용 게임 DLL은 MEALKIT_GAME_MODULE로 만드는 함수를 내보낸다.
 // 출시용 exe는 게임 클래스를 직접 쓴다 (final이면 가상 호출도 사라진다).
-namespace aster::game {
+namespace mealkit::game {
 
 // DLL 경계의 약속이 바뀌면 올린다. 에디터는 번호가 다른 게임 DLL을 불러오지 않는다.
 inline constexpr u32 kApiVersion = 1;
@@ -59,7 +59,7 @@ public:
     virtual f64 takeSimMsPerTick() = 0; // 지난 호출 이후 평균
 };
 
-// 게임 DLL이 내보내는 정보. 에디터가 asterGetGameModule()로 받는다.
+// 게임 DLL이 내보내는 정보. 에디터가 mealkitGetGameModule()로 받는다.
 struct GameModule {
     u32 apiVersion = kApiVersion;
     const char* name = "";
@@ -68,16 +68,16 @@ struct GameModule {
 };
 
 using GetGameModuleFn = const GameModule* (*)();
-inline constexpr const char* kGetGameModuleSymbol = "asterGetGameModule";
+inline constexpr const char* kGetGameModuleSymbol = "mealkitGetGameModule";
 
-} // namespace aster::game
+} // namespace mealkit::game
 
-// 게임 DLL에서 한 번 쓴다: ASTER_GAME_MODULE("Sandbox", sandbox::GameSession)
-#define ASTER_GAME_MODULE(NameLiteral, GameClass)                                                          \
-    extern "C" __declspec(dllexport) const ::aster::game::GameModule* asterGetGameModule() {             \
-        static const ::aster::game::GameModule module{                                                     \
-            ::aster::game::kApiVersion, NameLiteral,                                                        \
-            []() -> ::aster::game::GameInstance* { return new GameClass(); },                              \
-            [](::aster::game::GameInstance* g) { delete g; }};                                             \
+// 게임 DLL에서 한 번 쓴다: MEALKIT_GAME_MODULE("Sandbox", sandbox::GameSession)
+#define MEALKIT_GAME_MODULE(NameLiteral, GameClass)                                                          \
+    extern "C" __declspec(dllexport) const ::mealkit::game::GameModule* mealkitGetGameModule() {             \
+        static const ::mealkit::game::GameModule module{                                                     \
+            ::mealkit::game::kApiVersion, NameLiteral,                                                        \
+            []() -> ::mealkit::game::GameInstance* { return new GameClass(); },                              \
+            [](::mealkit::game::GameInstance* g) { delete g; }};                                             \
         return &module;                                                                                    \
     }
