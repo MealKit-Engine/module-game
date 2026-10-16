@@ -18,8 +18,10 @@ inline constexpr const char* kDefaultTuningAsset = "assets/game.tuning";
 // 읽은 파일 경로를 돌려준다 (없으면 빈 문자열).
 std::string loadTuning(const reflect::TypeInfo& type, void* data, const std::string& path = {});
 
-// 접속할 때 비교하는 해시: 씬(게임 결과에 영향을 주는 부분) + 모델 파일 + 튜닝 값.
+// 접속할 때 비교하는 해시: 씬(게임 결과에 영향을 주는 부분) + 모델 파일 + 튜닝 값
+// + 프로젝트 설정(엔진 ProjectSettings와 게임 항목 중 MEALKIT_VIEW_FIELD가 아닌 것).
 u64 contentHash(const scene::Scene& scene, asset::ModelCache& models, const scene::TypeList* gameTypes,
-                const reflect::TypeInfo* tuningType, const void* tuning);
+                const reflect::TypeInfo* tuningType, const void* tuning, reflect::View project = {},
+                reflect::View gameProject = {});
 
 } // namespace mealkit::game

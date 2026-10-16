@@ -22,11 +22,15 @@ std::string loadTuning(const reflect::TypeInfo& type, void* data, const std::str
 }
 
 u64 contentHash(const scene::Scene& scene, asset::ModelCache& models, const scene::TypeList* gameTypes,
-                const reflect::TypeInfo* tuningType, const void* tuning) {
+                const reflect::TypeInfo* tuningType, const void* tuning, reflect::View project,
+                reflect::View gameProject) {
     Hasher h;
     h.add(scene.contentHash(gameTypes));
     h.add(models.hashModels(scene));
     if (tuningType && tuning) reflect::hashStruct(*tuningType, tuning, h);
+    if (project.type && project.data) reflect::hashStruct(*project.type, project.data, h, reflect::kFieldView);
+    if (gameProject.type && gameProject.data)
+        reflect::hashStruct(*gameProject.type, gameProject.data, h, reflect::kFieldView);
     return h.value;
 }
 

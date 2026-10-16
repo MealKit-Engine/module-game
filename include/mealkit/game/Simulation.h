@@ -31,6 +31,8 @@ template <class World>
 class Simulation final : public SimDebug {
 public:
     using State = std::remove_cvref_t<decltype(std::declval<World&>().state)>;
+    static_assert(!reflect::hasStringField<State>(),
+                  "simulation state must not contain std::string (keep names in tuning/scene data, use ids in state)");
 
     static constexpr u32 kSnapshotInterval = 150; // 틱 (30Hz에서 5초)
     static constexpr u32 kKeepSnapshots = 40;     // 약 3분 20초를 되감을 수 있다
@@ -166,9 +168,9 @@ public:
         for (const WorldSnapshot& s : m_snapshots)
             if (s.tick <= tick) from = &s;
         if (!loadSnapshot(*m_world, *from)) {
-            m_replayError = "틱 " + std::to_string(from->tick) +
-                            " 스냅샷을 복원한 해시가 저장할 때와 다릅니다. 틱을 넘어 남는 값이 MEALKIT_FIELD로 "
-                            "선언되지 않았을 수 있습니다";
+            m_replayError = "The snapshot of tick " + std::to_string(from->tick) +
+                            " does not restore to the hash it was saved with. A value that lives across ticks may "
+                            "not be declared with MEALKIT_FIELD";
             MEALKIT_ERROR("Rewind: snapshot of tick %u does not restore to the saved hash (undeclared state?)",
                           from->tick);
         }
@@ -177,9 +179,9 @@ public:
             m_previous = m_world->state;
             m_world->step(m_inputs[t - m_inputBase]);
             if (m_world->hash() != m_hashes[t - m_inputBase] && m_replayError.empty()) {
-                m_replayError =
-                    "되감기로 다시 돌린 틱 " + std::to_string(t) +
-                    "의 해시가 기록과 다릅니다. 선언하지 않은 상태(MEALKIT_FIELD 누락)나 결정론 위반이 있습니다";
+                m_replayError = "Replayed tick " + std::to_string(t) +
+                                " does not match the recorded hash. There is undeclared state (missing MEALKIT_FIELD) "
+                                "or nondeterminism";
                 MEALKIT_ERROR(
                     "Rewind: replayed tick %u does not match the recorded hash (undeclared state or nondeterminism)",
                     t);
