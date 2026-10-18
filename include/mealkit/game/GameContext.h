@@ -19,6 +19,9 @@ class Actions;
 namespace loc {
 class Strings;
 }
+namespace ui {
+class System;
+}
 namespace asset {
 class ModelCache;
 }
@@ -44,6 +47,8 @@ struct GameContext {
     input::Actions& actions;
     // 게임 문자열 표 (mealkit/loc/Strings.h, assets/strings/<언어>.txt): 플레이어에게 보이는 글자는 strings.get("키")로
     const loc::Strings& strings;
+    // 게임 화면 UI (mealkit/ui/Ui.h, assets/ui/*.ui): open → bind(뷰 모델) → 매 프레임 뷰 모델 채우기, actions()로 버튼 액션
+    ui::System& ui;
 
     // 엔진이 매 프레임 정하는 값
     render::Viewport viewport{}; // 게임 화면 영역 (에디터에서는 씬 뷰)

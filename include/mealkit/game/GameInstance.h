@@ -28,8 +28,8 @@ namespace mealkit::game {
 // 9: 화면용 튜닝(ViewTuningType, GameContext::viewTuning)·Ticks·Color 필드, 10: 정의 데이터 표(MEALKIT_TABLE, RowRef),
 // 11: 소리(GameContext::audio), FrameParams::cameraForward, 12: 연출 표(GameContext::feedback, EventType), MEALKIT_ENUM,
 // 13: 입력 액션(GameContext::actions), 14: 디버그 UI(GameInstance::debugUi, 에디터와 게임 DLL이 mealkit.dll의 ImGui 하나를 쓴다),
-// 15: 문자열 표(GameContext::strings)
-inline constexpr u32 kApiVersion = 15;
+// 15: 문자열 표(GameContext::strings), 16: 게임 화면 UI(GameContext::ui, GameModule::viewModels)
+inline constexpr u32 kApiVersion = 16;
 
 struct PlayOptions {
     bool bot = false;    // 스크립트 입력 (자동 테스트)
@@ -94,6 +94,8 @@ struct GameModule {
     const reflect::TableList* (*tables)() = nullptr;
     // 틱 이벤트 타입 (GameClass::EventType, 없으면 nullptr). 에디터 [연출] 패널이 종류(MEALKIT_ENUM) 이름과 필드를 보여 준다.
     const reflect::TypeInfo* (*eventType)() = nullptr;
+    // 게임이 MEALKIT_VIEWMODEL로 선언한 뷰 모델 (에디터 [UI] 미리보기의 가짜 값, 바인딩 검사). DLL을 내리면 무효가 된다.
+    const std::vector<const reflect::TypeInfo*>* (*viewModels)() = nullptr;
 };
 
 // GameClass::ProjectSettingsType이 있으면 그 타입 (MEALKIT_GAME_MODULE이 쓴다)
@@ -144,6 +146,9 @@ inline constexpr const char* kGetGameModuleSymbol = "mealkitGetGameModule";
             &::mealkit::game::gameProjectSettingsType<GameClass>,                                                      \
             &::mealkit::game::gameViewTuningType<GameClass>,                                                           \
             []() -> const ::mealkit::reflect::TableList* { return &::mealkit::reflect::moduleTables(); },              \
-            &::mealkit::game::gameEventType<GameClass>};                                                               \
+            &::mealkit::game::gameEventType<GameClass>,                                                                \
+            []() -> const std::vector<const ::mealkit::reflect::TypeInfo*>* {                                          \
+                return &::mealkit::reflect::moduleViewModels();                                                        \
+            }};                                                                                                        \
         return &module;                                                                                                \
     }
