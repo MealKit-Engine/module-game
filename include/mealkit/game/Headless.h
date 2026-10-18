@@ -165,8 +165,8 @@ int runHeadless(int argc, char** argv) {
 
     Simulation<World> sim;
     const bool offline = options.mode == HeadlessOptions::Mode::Offline;
-    FrameLimiter limiter; // 네트워크 대기 중에는 1ms씩 잔다. 혼자면 쉬지 않고 돈다
-    limiter.setTargetFps(offline ? 0.0 : 1000.0);
+    // 혼자면 쉬지 않고 돈다. 네트워크면 이번 반복에 틱이 나아가지 않았을 때만(입력 대기) 1ms 잔다.
+    // 바쁜 대기를 하면 코어가 적은 PC(CI 러너)에서 여러 피어의 물리 작업 스레드가 돌 시간을 뺏는다.
     const u32 autoStart = options.autoStart ? options.autoStart : options.maxPlayers;
     const f64 frameDt = static_cast<f64>(Game::kTickDt) * Simulation<World>::kCatchUpTicks; // 한 번에 최대한 따라잡는다
     int exitCode = 0;
@@ -189,6 +189,7 @@ int runHeadless(int argc, char** argv) {
             MEALKIT_INFO("Headless match: %u player(s), you are player %u, match data %u", session.playerCount(),
                          session.localPlayer(), session.matchData());
         }
+        const u32 tickBefore = sim.started() ? sim.nextTick() : 0;
         sim.update(
             session, frameDt, [&](u32 tick) { return Game::botInput(tick, session.localPlayer()); },
             [](const World&) {});
@@ -202,7 +203,8 @@ int runHeadless(int argc, char** argv) {
             std::fflush(stdout);
             exitDeadline = offline ? now : now + 1.0; // 상대가 마지막 틱을 받을 시간을 준 뒤 종료
         }
-        limiter.wait();
+        const bool idle = exitDeadline > 0.0 || !sim.started() || sim.nextTick() == tickBefore;
+        if (!offline && idle) sleepSeconds(0.001);
     }
     session.shutdown();
     return exitCode;
