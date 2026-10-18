@@ -24,8 +24,8 @@ struct Scene;
 namespace mealkit::game {
 
 // DLL 경계의 약속이 바뀌면 올린다. 에디터는 번호가 다른 게임 DLL을 불러오지 않는다.
-// 2: GameContext, 3: 게임 오브젝트 종류, 4: 튜닝, 5: 상태 보기, 6: 디버그 제어, 7: 프로젝트 설정·문자열 필드
-inline constexpr u32 kApiVersion = 7;
+// 2: GameContext, 3: 게임 오브젝트 종류, 4: 튜닝, 5: 상태 보기, 6: 디버그 제어, 7: 프로젝트 설정·문자열 필드, 8: 해시 로그·입력 기록
+inline constexpr u32 kApiVersion = 8;
 
 struct PlayOptions {
     bool bot = false;    // 스크립트 입력 (자동 테스트)
@@ -36,6 +36,8 @@ struct PlayOptions {
     std::string tuningPath; // 비어 있으면 assets/game.tuning (에디터는 저장 안 된 값을 임시 파일로 넘긴다)
     bool shadow = false;    // 그림자 시뮬레이션: World를 하나 더 돌려 매 틱 비교 (에디터, 시뮬레이션 CPU 2배)
     bool record = false;    // 입력 기록 + 스냅샷: 일시정지, 한 틱 진행, 되감기 (에디터 혼자 플레이)
+    std::string hashLogPath;      // 비어 있지 않으면 틱마다 "<틱> <상태 해시>" 한 줄 (--hash-log, 빌드·플랫폼 사이 비교)
+    std::string recordInputsPath; // 비어 있지 않으면 확정된 입력과 해시를 파일로 (--record-inputs, game/InputRecord.h)
 };
 
 // 한 판: 결정론 시뮬레이션 실행, 로컬 입력, 카메라, 그리기.

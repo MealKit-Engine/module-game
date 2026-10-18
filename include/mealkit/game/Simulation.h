@@ -5,6 +5,7 @@
 #include "mealkit/core/Profile.h"
 #include "mealkit/core/Reflect.h"
 #include "mealkit/game/GameInstance.h"
+#include "mealkit/game/InputRecord.h"
 #include "mealkit/game/SimDebug.h"
 #include "mealkit/game/WorldSnapshot.h"
 #include "mealkit/net/Lockstep.h"
@@ -22,6 +23,7 @@
 //   - 그림자 시뮬레이션 (PlayOptions::shadow): 같은 입력으로 World를 하나 더 돌려 매 틱 해시를 비교한다.
 //     다르면 멈추고 처음 갈라진 틱과 상태 필드 차이를 남긴다 (초기화 안 된 값, 전역 상태, 포인터 순서, 실제 시간 읽기를 잡는다)
 //   - 기록 (PlayOptions::record): 틱 입력과 해시, 주기적 스냅샷 → 일시정지, 한 틱 진행, 되감기
+//   - 해시 로그·입력 기록 파일 (PlayOptions::hashLogPath, recordInputsPath): 빌드·플랫폼 사이 비교 (game/InputRecord.h)
 //
 // World 약속: state(MEALKIT_STRUCT, state.tick), physics, events, step(const net::TickInputs&), hash().
 // 매치를 시작할 때 reset(World&, 물리 스레드 수)으로 진짜·그림자 World를 똑같이 초기화한다.
@@ -61,6 +63,9 @@ public:
         m_stepRequests = 0;
         m_replayError.clear();
         clearHistory();
+        m_recordWriter.close();
+        m_hashLog.close();
+        if (!options.hashLogPath.empty()) m_hashLog.open(options.hashLogPath);
     }
 
     bool started() const { return m_started; }
@@ -202,6 +207,11 @@ private:
         m_world->step(inputs);
         const u64 hash = m_world->hash();
         session.tickExecuted(m_nextTick, hash);
+        if (m_nextTick == 0 && !m_options.recordInputsPath.empty()) // 매치 값은 세션이 Running이 된 뒤에 확정된다
+            m_recordWriter.open(m_options.recordInputsPath, {session.seed(), session.playerCount(), session.matchData()},
+                                session.contentHash());
+        m_recordWriter.write(inputs, hash);
+        m_hashLog.write(m_nextTick, hash);
 
         if (m_shadow && !m_shadowStatus.desynced) {
             m_shadow->step(inputs);
@@ -216,7 +226,11 @@ private:
         const bool last = m_options.exitTick && m_nextTick >= m_options.exitTick;
         ++m_nextTick;
         ++m_simTicks;
-        if (last) m_finished = true;
+        if (last) {
+            m_finished = true;
+            m_recordWriter.close();
+            m_hashLog.close();
+        }
     }
 
     void reportShadowDesync() {
@@ -294,6 +308,9 @@ private:
     u32 m_inputBase = 0;
     WorldSnapshot m_live; // 과거를 보는 동안 현재 상태
     State m_livePrevious;
+
+    InputRecordWriter m_recordWriter;
+    HashLog m_hashLog;
 };
 
 } // namespace mealkit::game
