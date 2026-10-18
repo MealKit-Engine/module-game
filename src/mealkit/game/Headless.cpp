@@ -96,7 +96,7 @@ bool loadHeadlessData(const HeadlessOptions& options, const reflect::TypeInfo& t
     // 출시 exe(main.cpp)와 같은 해시라야 창 있는 피어와도 접속되고, 입력 기록을 서로 재생할 수 있다
     out.contentHash = contentHash(out.scene, out.models, &reflect::moduleObjectTypes(), &tuningType, tuning,
                                   {&reflect::typeOf<ProjectSettings>(), &out.project.settings},
-                                  {gameProjectType, gameProject});
+                                  {gameProjectType, gameProject}, &reflect::moduleTables());
     return true;
 }
 

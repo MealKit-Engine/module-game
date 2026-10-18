@@ -2,6 +2,7 @@
 
 #include "mealkit/asset/ModelCache.h"
 #include "mealkit/core/Log.h"
+#include "mealkit/game/Tables.h"
 #include "mealkit/platform/Paths.h"
 
 namespace mealkit::game {
@@ -61,7 +62,7 @@ bool LiveTuning::poll(f64 now) {
 
 u64 contentHash(const scene::Scene& scene, asset::ModelCache& models, const scene::TypeList* gameTypes,
                 const reflect::TypeInfo* tuningType, const void* tuning, reflect::View project,
-                reflect::View gameProject) {
+                reflect::View gameProject, const reflect::TableList* tables) {
     Hasher h;
     h.add(scene.contentHash(gameTypes));
     h.add(models.hashModels(scene));
@@ -69,6 +70,7 @@ u64 contentHash(const scene::Scene& scene, asset::ModelCache& models, const scen
     if (project.type && project.data) reflect::hashStruct(*project.type, project.data, h, reflect::kFieldView);
     if (gameProject.type && gameProject.data)
         reflect::hashStruct(*gameProject.type, gameProject.data, h, reflect::kFieldView);
+    if (tables) hashTables(*tables, h);
     return h.value;
 }
 

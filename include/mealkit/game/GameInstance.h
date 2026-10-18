@@ -25,8 +25,8 @@ namespace mealkit::game {
 
 // DLL 경계의 약속이 바뀌면 올린다. 에디터는 번호가 다른 게임 DLL을 불러오지 않는다.
 // 2: GameContext, 3: 게임 오브젝트 종류, 4: 튜닝, 5: 상태 보기, 6: 디버그 제어, 7: 프로젝트 설정·문자열 필드, 8: 해시 로그·입력 기록,
-// 9: 화면용 튜닝(ViewTuningType, GameContext::viewTuning)·Ticks·Color 필드
-inline constexpr u32 kApiVersion = 9;
+// 9: 화면용 튜닝(ViewTuningType, GameContext::viewTuning)·Ticks·Color 필드, 10: 정의 데이터 표(MEALKIT_TABLE, RowRef)
+inline constexpr u32 kApiVersion = 10;
 
 struct PlayOptions {
     bool bot = false;    // 스크립트 입력 (자동 테스트)
@@ -83,6 +83,8 @@ struct GameModule {
     const reflect::TypeInfo* (*projectSettingsType)() = nullptr;
     // 화면용 튜닝 (GameClass::ViewTuningType, 없으면 nullptr). 에디터 [튜닝] 패널의 "화면" 탭, assets/view.tuning.
     const reflect::TypeInfo* (*viewTuningType)() = nullptr;
+    // 게임이 MEALKIT_TABLE로 등록한 정의 데이터 표 (에디터 [표] 패널, 콘텐츠 해시). DLL을 내리면 무효가 된다.
+    const reflect::TableList* (*tables)() = nullptr;
 };
 
 // GameClass::ProjectSettingsType이 있으면 그 타입 (MEALKIT_GAME_MODULE이 쓴다)
@@ -123,6 +125,7 @@ inline constexpr const char* kGetGameModuleSymbol = "mealkitGetGameModule";
                 return &::mealkit::reflect::typeOf<typename GameClass::TuningType>();                                  \
             },                                                                                                         \
             &::mealkit::game::gameProjectSettingsType<GameClass>,                                                      \
-            &::mealkit::game::gameViewTuningType<GameClass>};                                                          \
+            &::mealkit::game::gameViewTuningType<GameClass>,                                                           \
+            []() -> const ::mealkit::reflect::TableList* { return &::mealkit::reflect::moduleTables(); }};             \
         return &module;                                                                                                \
     }

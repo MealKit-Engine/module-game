@@ -42,9 +42,9 @@ private:
 };
 
 // 접속할 때 비교하는 해시: 씬(게임 결과에 영향을 주는 부분) + 모델 파일 + 튜닝 값
-// + 프로젝트 설정(엔진 ProjectSettings와 게임 항목 중 MEALKIT_VIEW_FIELD가 아닌 것).
+// + 프로젝트 설정(엔진 ProjectSettings와 게임 항목 중 MEALKIT_VIEW_FIELD가 아닌 것) + 시뮬레이션 표(kTableView가 아닌 MEALKIT_TABLE).
 u64 contentHash(const scene::Scene& scene, asset::ModelCache& models, const scene::TypeList* gameTypes,
                 const reflect::TypeInfo* tuningType, const void* tuning, reflect::View project = {},
-                reflect::View gameProject = {});
+                reflect::View gameProject = {}, const reflect::TableList* tables = nullptr);
 
 } // namespace mealkit::game
