@@ -1,5 +1,7 @@
 #pragma once
 
+#include "mealkit/core/Log.h"
+#include "mealkit/core/Reflect.h"
 #include "mealkit/core/Types.h"
 #include "mealkit/render/Renderer.h"
 
@@ -28,6 +30,19 @@ struct GameContext {
     render::Viewport viewport{}; // 게임 화면 영역 (에디터에서는 씬 뷰)
     bool keyboardAllowed = true; // 에디터: 게임 뷰가 키보드를 받을 때만
     bool mouseAllowed = true;
+    // 화면용 튜닝 (게임의 ViewTuningType 값, assets/view.tuning). 파일이 바뀌면 엔진이 다시 읽는다(여러 명 플레이 중에도).
+    // 게임은 viewTuning<ViewTuning>()으로 읽는다. 다음 프레임에 값이 바뀔 수 있으므로 보관하지 않는다.
+    reflect::View viewTuningData{};
+
+    template <class T>
+    const T& viewTuning() const {
+        MEALKIT_ASSERT(!viewTuningData.data || viewTuningData.type == &reflect::typeOf<T>());
+        if (!viewTuningData.data) { // 엔진이 넘기지 않았다 (게임 모듈에 ViewTuningType이 없음): 선언의 기본값
+            static const T defaults{};
+            return defaults;
+        }
+        return *static_cast<const T*>(viewTuningData.data);
+    }
 };
 
 } // namespace mealkit::game

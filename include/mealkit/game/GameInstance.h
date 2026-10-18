@@ -24,8 +24,9 @@ struct Scene;
 namespace mealkit::game {
 
 // DLL 경계의 약속이 바뀌면 올린다. 에디터는 번호가 다른 게임 DLL을 불러오지 않는다.
-// 2: GameContext, 3: 게임 오브젝트 종류, 4: 튜닝, 5: 상태 보기, 6: 디버그 제어, 7: 프로젝트 설정·문자열 필드, 8: 해시 로그·입력 기록
-inline constexpr u32 kApiVersion = 8;
+// 2: GameContext, 3: 게임 오브젝트 종류, 4: 튜닝, 5: 상태 보기, 6: 디버그 제어, 7: 프로젝트 설정·문자열 필드, 8: 해시 로그·입력 기록,
+// 9: 화면용 튜닝(ViewTuningType, GameContext::viewTuning)·Ticks·Color 필드
+inline constexpr u32 kApiVersion = 9;
 
 struct PlayOptions {
     bool bot = false;    // 스크립트 입력 (자동 테스트)
@@ -80,6 +81,8 @@ struct GameModule {
     const reflect::TypeInfo* (*tuningType)() = nullptr;
     // 게임이 더한 프로젝트 설정 (GameClass::ProjectSettingsType, 없으면 nullptr). mealkit.project의 game.* 줄.
     const reflect::TypeInfo* (*projectSettingsType)() = nullptr;
+    // 화면용 튜닝 (GameClass::ViewTuningType, 없으면 nullptr). 에디터 [튜닝] 패널의 "화면" 탭, assets/view.tuning.
+    const reflect::TypeInfo* (*viewTuningType)() = nullptr;
 };
 
 // GameClass::ProjectSettingsType이 있으면 그 타입 (MEALKIT_GAME_MODULE이 쓴다)
@@ -87,6 +90,15 @@ template <class GameClass>
 const reflect::TypeInfo* gameProjectSettingsType() {
     if constexpr (requires { typename GameClass::ProjectSettingsType; })
         return &reflect::typeOf<typename GameClass::ProjectSettingsType>();
+    else
+        return nullptr;
+}
+
+// GameClass::ViewTuningType이 있으면 그 타입
+template <class GameClass>
+const reflect::TypeInfo* gameViewTuningType() {
+    if constexpr (requires { typename GameClass::ViewTuningType; })
+        return &reflect::typeOf<typename GameClass::ViewTuningType>();
     else
         return nullptr;
 }
@@ -110,6 +122,7 @@ inline constexpr const char* kGetGameModuleSymbol = "mealkitGetGameModule";
             []() -> const ::mealkit::reflect::TypeInfo* {                                                              \
                 return &::mealkit::reflect::typeOf<typename GameClass::TuningType>();                                  \
             },                                                                                                         \
-            &::mealkit::game::gameProjectSettingsType<GameClass>};                                                     \
+            &::mealkit::game::gameProjectSettingsType<GameClass>,                                                      \
+            &::mealkit::game::gameViewTuningType<GameClass>};                                                          \
         return &module;                                                                                                \
     }
