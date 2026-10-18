@@ -13,7 +13,7 @@
 //   해시 로그(--hash-log): 틱마다 "<틱> <해시16진>" 한 줄. 두 실행의 파일이 같으면 처음부터 끝까지 같은 상태다.
 // 파일 형식(리틀 엔디언): "MKINPUT1", u32 버전, u32 인원, u64 시드, u32 매치 데이터, u32 0, u64 콘텐츠 해시,
 // 그 뒤 틱마다 (인원 × 8바이트 입력, u16 명령 바이트 수 + 명령 바이트, u64 해시). 끝까지 읽은 틱이 틱 수다 (중간에 끝나도 앞부분은 쓸 수 있다).
-// 버전 1(명령 없음, 틱 크기 고정)도 읽는다.
+// 버전 3은 머리 뒤에 플레이어마다 u8 로드아웃 크기 + 바이트. 버전 1(명령 없음, 틱 크기 고정)·2(로드아웃 없음)도 읽는다.
 namespace mealkit::game {
 
 // 매치를 똑같이 다시 만드는 데 필요한 값 (락스텝 세션이 정해 모두에게 보낸 것)
@@ -21,7 +21,11 @@ struct MatchInfo {
     u64 seed = 0;
     u32 playerCount = 1;
     u32 matchData = 0;
+    std::vector<std::vector<u8>> loadouts; // 플레이어별 매치 시작 데이터 (mealkit/game/Loadout.h, 없으면 빈 것)
 };
+
+// 세션이 확정한 매치 값 (Running 이후)
+MatchInfo matchInfo(const net::LockstepSession& session);
 
 struct InputRecording {
     MatchInfo match;

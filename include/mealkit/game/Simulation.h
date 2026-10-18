@@ -208,8 +208,7 @@ private:
         const u64 hash = m_world->hash();
         session.tickExecuted(m_nextTick, hash);
         if (m_nextTick == 0 && !m_options.recordInputsPath.empty()) // 매치 값은 세션이 Running이 된 뒤에 확정된다
-            m_recordWriter.open(m_options.recordInputsPath, {session.seed(), session.playerCount(), session.matchData()},
-                                session.contentHash());
+            m_recordWriter.open(m_options.recordInputsPath, matchInfo(session), session.contentHash());
         m_recordWriter.write(inputs, hash);
         m_hashLog.write(m_nextTick, hash);
 

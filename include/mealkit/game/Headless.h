@@ -30,6 +30,7 @@
 //                          asset::ModelCache&, u32 physicsThreads);   // 매치 시작 (GameSession도 같은 함수를 쓴다)
 //   static net::PlayerInput botInput(u32 tick, u8 player);            // --bot 입력 (GameSession도 같은 함수를 쓴다)
 //   static void botCommands(u32 tick, u8 player, net::LockstepSession&); // (선택) --bot 확정 명령 (mealkit/sim/Commands.h)
+//   static void botLoadout(u8 player, net::LockstepSession&);       // (선택) 봇의 매치 시작 데이터 (mealkit/game/Loadout.h)
 //   static void defaults(game::HeadlessOptions&, const ProjectSettingsType&); // (선택) 포트·인원·매치 데이터 기본값
 namespace mealkit::game {
 
@@ -153,6 +154,10 @@ int runHeadless(int argc, char** argv) {
     session.setContentHash(data.contentHash);
     session.setAcceptOtherBuilds(options.anyBuild);
     const u64 seed = options.seed ? options.seed : static_cast<u64>(std::time(nullptr));
+    auto loadout = [&] {
+        if constexpr (requires { Game::botLoadout(u8{0}, session); }) Game::botLoadout(session.localPlayer(), session);
+    };
+    loadout(); // 혼자면 세션을 열면서 바로 시작하므로 그 전에
     if (!startHeadlessSession(session, options, seed)) return 1;
 
     PlayOptions play;
@@ -176,6 +181,7 @@ int runHeadless(int argc, char** argv) {
         const f64 now = nowSeconds();
         if (exitDeadline > 0.0 && now >= exitDeadline) break;
         session.update(now);
+        if (session.state() == net::SessionState::Lobby) loadout();
         if (session.isHost() && session.state() == net::SessionState::Lobby && session.lobbyPlayerCount() >= autoStart)
             session.startMatch(seed, options.matchData);
         if (session.state() == net::SessionState::Ended && exitDeadline == 0.0) {
@@ -185,7 +191,7 @@ int runHeadless(int argc, char** argv) {
         }
         if (!sim.started() && session.state() == net::SessionState::Running) {
             sim.start(play, Game::kTickDt, [&](World& world, u32 physicsThreads) {
-                start(world, {session.seed(), session.playerCount(), session.matchData()}, physicsThreads);
+                start(world, matchInfo(session), physicsThreads);
             });
             MEALKIT_INFO("Headless match: %u player(s), you are player %u, match data %u", session.playerCount(),
                          session.localPlayer(), session.matchData());

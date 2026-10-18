@@ -29,8 +29,8 @@ namespace mealkit::game {
 // 11: 소리(GameContext::audio), FrameParams::cameraForward, 12: 연출 표(GameContext::feedback, EventType), MEALKIT_ENUM,
 // 13: 입력 액션(GameContext::actions), 14: 디버그 UI(GameInstance::debugUi, 에디터와 게임 DLL이 mealkit.dll의 ImGui 하나를 쓴다),
 // 15: 문자열 표(GameContext::strings), 16: 게임 화면 UI(GameContext::ui, GameModule::viewModels),
-// 17: 플레이어 설정(GameContext::settings), 18: GameContext::userFolder (세이브)
-inline constexpr u32 kApiVersion = 18;
+// 17: 플레이어 설정(GameContext::settings), 18: GameContext::userFolder (세이브), 19: 매치 시작 데이터(GameInstance::lobby, MatchInfo::loadouts)
+inline constexpr u32 kApiVersion = 19;
 
 struct PlayOptions {
     bool bot = false;    // 스크립트 입력 (자동 테스트)
@@ -50,6 +50,11 @@ class GameInstance {
 public:
     virtual ~GameInstance() = default;
 
+    // 매치가 시작되기 전 매 프레임 (혼자 플레이는 세션을 열기 직전 한 번): 이 플레이어의 매치 시작 데이터를 정한다
+    // (game::setLoadout, mealkit/game/Loadout.h). userFolder는 세이브를 읽을 곳 (비어 있으면 없음)
+    virtual void lobby(net::LockstepSession& session, const PlayOptions& options, const std::string& userFolder) {
+        (void)session, (void)options, (void)userFolder;
+    }
     // 세션이 Running이 되면 한 번 호출한다.
     virtual void start(GameContext& ctx, const scene::Scene& scene, const PlayOptions& options) = 0;
     virtual bool started() const = 0;

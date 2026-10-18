@@ -3,13 +3,14 @@
 #include "mealkit/core/Log.h"
 #include "mealkit/platform/Paths.h"
 
+#include <algorithm>
 #include <cstring>
 
 namespace mealkit::game {
 namespace {
 
 constexpr char kMagic[8] = {'M', 'K', 'I', 'N', 'P', 'U', 'T', '1'};
-constexpr u32 kVersion = 2; // 2: 틱마다 확정 명령
+constexpr u32 kVersion = 3; // 2: 틱마다 확정 명령, 3: 머리에 로드아웃
 constexpr size_t kHeaderBytes = 8 + 4 + 4 + 8 + 4 + 4 + 8;
 
 // 어느 CPU에서 써도 같은 바이트가 되도록 직접 리틀 엔디언으로 쓴다
@@ -41,6 +42,12 @@ bool InputRecordWriter::open(const std::string& path, const MatchInfo& match, u6
     put(header, match.matchData, 4);
     put(header, 0, 4);
     put(header, contentHash, 8);
+    for (u32 p = 0; p < match.playerCount; ++p) {
+        const std::vector<u8> none;
+        const std::vector<u8>& l = p < match.loadouts.size() ? match.loadouts[p] : none;
+        put(header, std::min<size_t>(l.size(), net::kMaxLoadoutBytes), 1);
+        header.insert(header.end(), l.begin(), l.begin() + static_cast<std::ptrdiff_t>(std::min<size_t>(l.size(), net::kMaxLoadoutBytes)));
+    }
     std::fwrite(header.data(), 1, header.size(), m_file);
     return true;
 }
@@ -80,7 +87,7 @@ bool loadInputRecording(const std::string& path, InputRecording& out, std::strin
     }
     const u8* p = data.data() + 8;
     const u32 version = static_cast<u32>(get(p, 4));
-    if (version != 1 && version != kVersion) {
+    if (version < 1 || version > kVersion) {
         error = "unsupported input record version " + std::to_string(version);
         return false;
     }
@@ -94,6 +101,21 @@ bool loadInputRecording(const std::string& path, InputRecording& out, std::strin
         return false;
     }
     const u8* end = data.data() + data.size();
+    out.match.loadouts.assign(out.match.playerCount, {});
+    if (version >= 3)
+        for (u32 pl = 0; pl < out.match.playerCount; ++pl) {
+            if (p >= end) {
+                error = "truncated loadouts";
+                return false;
+            }
+            const size_t size = static_cast<size_t>(get(p, 1));
+            if (static_cast<size_t>(end - p) < size) {
+                error = "truncated loadouts";
+                return false;
+            }
+            out.match.loadouts[pl].assign(p, p + size);
+            p += size;
+        }
     const size_t inputBytes = out.match.playerCount * net::kInputBytes;
     for (;;) {
         if (static_cast<size_t>(end - p) < inputBytes + (version >= 2 ? 2u : 0u) + 8u) break;
@@ -113,6 +135,12 @@ bool loadInputRecording(const std::string& path, InputRecording& out, std::strin
         out.hashes.push_back(get(p, 8));
     }
     return true;
+}
+
+MatchInfo matchInfo(const net::LockstepSession& session) {
+    MatchInfo m{session.seed(), session.playerCount(), session.matchData(), {}};
+    for (u32 i = 0; i < m.playerCount; ++i) m.loadouts.push_back(session.loadout(i));
+    return m;
 }
 
 bool HashLog::open(const std::string& path) {
