@@ -42,7 +42,7 @@ bool parseHeadlessArgs(int argc, char** argv, HeadlessOptions& o) {
         auto hasValue = [&] { return i + 1 < argc && argv[i + 1][0] != '-'; };
         const char* v = nullptr;
         if (a == "--headless" || a == "--bot" || a == "--debug" || a == "--mute" ||
-            a == "--debug-ui")
+            a == "--debug-ui" || a == "--settings")
             continue;
         if (a == "--host") {
             o.mode = HeadlessOptions::Mode::Host;

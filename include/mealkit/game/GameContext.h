@@ -22,6 +22,9 @@ class Strings;
 namespace ui {
 class System;
 }
+namespace settings {
+class Service;
+}
 namespace asset {
 class ModelCache;
 }
@@ -49,6 +52,8 @@ struct GameContext {
     const loc::Strings& strings;
     // 게임 화면 UI (mealkit/ui/Ui.h, assets/ui/*.ui): open → bind(뷰 모델) → 매 프레임 뷰 모델 채우기, actions()로 버튼 액션
     ui::System& ui;
+    // 플레이어 설정 (mealkit/settings/Settings.h): values()로 읽고(FOV 등, 시뮬레이션에는 넣지 않는다), open()으로 표준 설정 화면
+    settings::Service& settings;
 
     // 엔진이 매 프레임 정하는 값
     render::Viewport viewport{}; // 게임 화면 영역 (에디터에서는 씬 뷰)
