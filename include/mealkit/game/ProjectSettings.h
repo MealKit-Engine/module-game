@@ -31,6 +31,7 @@ MEALKIT_STRUCT(ProjectSettings) {
     MEALKIT_VIEW_FIELD(std::string, icon, "icon.png", "Game icon (PNG, project folder)");
     MEALKIT_FIELD_FLAGS(std::string, created, {}, "Development started (YYYY-MM-DD)",
                         reflect::kFieldView | reflect::kFieldReadOnly);
+    MEALKIT_VIEW_FIELD(u32, audioVoices, 32, "Sound voices mixed at once");
 };
 
 struct ProjectFile {

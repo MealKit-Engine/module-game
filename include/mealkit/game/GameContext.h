@@ -7,6 +7,9 @@
 
 namespace mealkit {
 class Window;
+namespace audio {
+class Engine;
+}
 namespace asset {
 class ModelCache;
 }
@@ -17,7 +20,7 @@ class LockstepSession;
 
 // 게임의 화면 쪽(app/, view/)이 쓰는 엔진 서비스 묶음 (docs/CODING_MODEL.md "엔진 기능에 어떻게 접근하나").
 // 엔진(출시 exe의 main, 범용 에디터)이 만들어 GameInstance의 함수마다 넘긴다. 게임은 이것을 보관하지 않는다.
-// sim/은 이것을 받지 않는다 (World&만). 소리·게임 UI·디버그 UI가 생기면 여기에 더한다 (그때 kApiVersion을 올린다).
+// sim/은 이것을 받지 않는다 (World&만). 게임 UI·디버그 UI가 생기면 여기에 더한다 (그때 kApiVersion을 올린다).
 namespace mealkit::game {
 
 struct GameContext {
@@ -25,6 +28,7 @@ struct GameContext {
     render::Renderer& renderer;
     asset::ModelCache& models;
     net::LockstepSession& session;
+    audio::Engine& audio; // 소리 이벤트 재생 (mealkit/audio/Audio.h). 장치가 없으면 호출이 아무 일도 하지 않는다
 
     // 엔진이 매 프레임 정하는 값
     render::Viewport viewport{}; // 게임 화면 영역 (에디터에서는 씬 뷰)
