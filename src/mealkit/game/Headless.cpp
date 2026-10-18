@@ -65,7 +65,7 @@ bool parseHeadlessArgs(int argc, char** argv, HeadlessOptions& o) {
         else if (a == "--record-inputs" && next(v)) o.recordInputsPath = v;
         else if (a == "--replay-inputs" && next(v)) o.replayInputsPath = v;
         else if (a == "--any-build") o.anyBuild = true;
-        else if ((a == "--vsync" || a == "--fps") && next(v)) continue;
+        else if ((a == "--vsync" || a == "--fps" || a == "--lang") && next(v)) continue;
         else if (a == "--size" && i + 2 < argc) i += 2;
         else if (a == "--help" || a == "-h") return false;
         else {

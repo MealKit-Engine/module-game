@@ -27,8 +27,9 @@ namespace mealkit::game {
 // 2: GameContext, 3: 게임 오브젝트 종류, 4: 튜닝, 5: 상태 보기, 6: 디버그 제어, 7: 프로젝트 설정·문자열 필드, 8: 해시 로그·입력 기록,
 // 9: 화면용 튜닝(ViewTuningType, GameContext::viewTuning)·Ticks·Color 필드, 10: 정의 데이터 표(MEALKIT_TABLE, RowRef),
 // 11: 소리(GameContext::audio), FrameParams::cameraForward, 12: 연출 표(GameContext::feedback, EventType), MEALKIT_ENUM,
-// 13: 입력 액션(GameContext::actions), 14: 디버그 UI(GameInstance::debugUi, 에디터와 게임 DLL이 mealkit.dll의 ImGui 하나를 쓴다)
-inline constexpr u32 kApiVersion = 14;
+// 13: 입력 액션(GameContext::actions), 14: 디버그 UI(GameInstance::debugUi, 에디터와 게임 DLL이 mealkit.dll의 ImGui 하나를 쓴다),
+// 15: 문자열 표(GameContext::strings)
+inline constexpr u32 kApiVersion = 15;
 
 struct PlayOptions {
     bool bot = false;    // 스크립트 입력 (자동 테스트)

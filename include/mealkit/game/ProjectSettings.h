@@ -32,6 +32,7 @@ MEALKIT_STRUCT(ProjectSettings) {
     MEALKIT_FIELD_FLAGS(std::string, created, {}, "Development started (YYYY-MM-DD)",
                         reflect::kFieldView | reflect::kFieldReadOnly);
     MEALKIT_VIEW_FIELD(u32, audioVoices, 32, "Sound voices mixed at once");
+    MEALKIT_VIEW_FIELD(std::string, language, "ko", "Default language (assets/strings/<language>.txt)");
 };
 
 struct ProjectFile {

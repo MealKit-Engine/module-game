@@ -16,6 +16,9 @@ class Player;
 namespace input {
 class Actions;
 }
+namespace loc {
+class Strings;
+}
 namespace asset {
 class ModelCache;
 }
@@ -39,6 +42,8 @@ struct GameContext {
     // 입력 액션 (mealkit/input/Actions.h, assets/input.bindings): 키를 직접 보지 않고 actions.axis2("move")처럼 읽는다.
     // 엔진이 매 프레임 update 전에 갱신한다(허용되지 않은 장치는 놓은 상태). window.input()은 엔진·디버그 키 전용.
     input::Actions& actions;
+    // 게임 문자열 표 (mealkit/loc/Strings.h, assets/strings/<언어>.txt): 플레이어에게 보이는 글자는 strings.get("키")로
+    const loc::Strings& strings;
 
     // 엔진이 매 프레임 정하는 값
     render::Viewport viewport{}; // 게임 화면 영역 (에디터에서는 씬 뷰)
