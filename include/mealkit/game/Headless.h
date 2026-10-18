@@ -29,6 +29,7 @@
 //   static void startWorld(World&, const game::MatchInfo&, const TuningType&, const scene::Scene& flatScene,
 //                          asset::ModelCache&, u32 physicsThreads);   // 매치 시작 (GameSession도 같은 함수를 쓴다)
 //   static net::PlayerInput botInput(u32 tick, u8 player);            // --bot 입력 (GameSession도 같은 함수를 쓴다)
+//   static void botCommands(u32 tick, u8 player, net::LockstepSession&); // (선택) --bot 확정 명령 (mealkit/sim/Commands.h)
 //   static void defaults(game::HeadlessOptions&, const ProjectSettingsType&); // (선택) 포트·인원·매치 데이터 기본값
 namespace mealkit::game {
 
@@ -191,7 +192,12 @@ int runHeadless(int argc, char** argv) {
         }
         const u32 tickBefore = sim.started() ? sim.nextTick() : 0;
         sim.update(
-            session, frameDt, [&](u32 tick) { return Game::botInput(tick, session.localPlayer()); },
+            session, frameDt,
+            [&](u32 tick) {
+                if constexpr (requires { Game::botCommands(tick, session.localPlayer(), session); })
+                    Game::botCommands(tick, session.localPlayer(), session);
+                return Game::botInput(tick, session.localPlayer());
+            },
             [](const World&) {});
         if (sim.finished() && exitDeadline == 0.0) {
             printFinal(sim.nextTick() - 1, sim.world().hash(), session.desynced());

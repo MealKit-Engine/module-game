@@ -9,7 +9,7 @@ namespace mealkit::game {
 namespace {
 
 constexpr char kMagic[8] = {'M', 'K', 'I', 'N', 'P', 'U', 'T', '1'};
-constexpr u32 kVersion = 1;
+constexpr u32 kVersion = 2; // 2: 틱마다 확정 명령
 constexpr size_t kHeaderBytes = 8 + 4 + 4 + 8 + 4 + 4 + 8;
 
 // 어느 CPU에서 써도 같은 바이트가 되도록 직접 리틀 엔디언으로 쓴다
@@ -48,9 +48,11 @@ bool InputRecordWriter::open(const std::string& path, const MatchInfo& match, u6
 void InputRecordWriter::write(const net::TickInputs& inputs, u64 hash) {
     if (!m_file) return;
     std::vector<u8> tick;
-    tick.reserve(m_players * net::kInputBytes + 8);
+    tick.reserve(m_players * net::kInputBytes + 2 + inputs.commandBytes + 8);
     for (u32 p = 0; p < m_players; ++p)
         tick.insert(tick.end(), inputs.players[p].bytes, inputs.players[p].bytes + net::kInputBytes);
+    put(tick, inputs.commandBytes, 2);
+    tick.insert(tick.end(), inputs.commands, inputs.commands + inputs.commandBytes);
     put(tick, hash, 8);
     std::fwrite(tick.data(), 1, tick.size(), m_file);
 }
@@ -78,7 +80,7 @@ bool loadInputRecording(const std::string& path, InputRecording& out, std::strin
     }
     const u8* p = data.data() + 8;
     const u32 version = static_cast<u32>(get(p, 4));
-    if (version != kVersion) {
+    if (version != 1 && version != kVersion) {
         error = "unsupported input record version " + std::to_string(version);
         return false;
     }
@@ -91,16 +93,24 @@ bool loadInputRecording(const std::string& path, InputRecording& out, std::strin
         error = "bad player count";
         return false;
     }
-    const size_t tickBytes = out.match.playerCount * net::kInputBytes + 8;
-    const size_t ticks = (data.size() - kHeaderBytes) / tickBytes;
-    out.inputs.resize(ticks);
-    out.hashes.resize(ticks);
-    for (size_t t = 0; t < ticks; ++t) {
+    const u8* end = data.data() + data.size();
+    const size_t inputBytes = out.match.playerCount * net::kInputBytes;
+    for (;;) {
+        if (static_cast<size_t>(end - p) < inputBytes + (version >= 2 ? 2u : 0u) + 8u) break;
+        net::TickInputs in{};
         for (u32 pl = 0; pl < out.match.playerCount; ++pl) {
-            std::memcpy(out.inputs[t].players[pl].bytes, p, net::kInputBytes);
+            std::memcpy(in.players[pl].bytes, p, net::kInputBytes);
             p += net::kInputBytes;
         }
-        out.hashes[t] = get(p, 8);
+        if (version >= 2) {
+            const u32 commandBytes = static_cast<u32>(get(p, 2));
+            if (commandBytes > net::kCommandBytesPerTick || static_cast<size_t>(end - p) < commandBytes + 8u) break;
+            in.commandBytes = static_cast<u16>(commandBytes);
+            std::memcpy(in.commands, p, commandBytes);
+            p += commandBytes;
+        }
+        out.inputs.push_back(in);
+        out.hashes.push_back(get(p, 8));
     }
     return true;
 }
