@@ -5,6 +5,8 @@
 #include "mealkit/core/Types.h"
 #include "mealkit/render/Renderer.h"
 
+#include <string>
+
 namespace mealkit {
 class Window;
 namespace audio {
@@ -62,6 +64,8 @@ struct GameContext {
     // 화면용 튜닝 (게임의 ViewTuningType 값, assets/view.tuning). 파일이 바뀌면 엔진이 다시 읽는다(여러 명 플레이 중에도).
     // 게임은 viewTuning<ViewTuning>()으로 읽는다. 다음 프레임에 값이 바뀔 수 있으므로 보관하지 않는다.
     reflect::View viewTuningData{};
+    // 플레이어별 파일 폴더 (세이브 mealkit/game/Save.h, 설정, 바꾼 키). 비어 있으면 저장하지 않는다 (자동 실행, 참가 창)
+    std::string userFolder;
 
     template <class T>
     const T& viewTuning() const {
