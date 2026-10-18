@@ -13,6 +13,9 @@ class Engine;
 namespace feedback {
 class Player;
 }
+namespace input {
+class Actions;
+}
 namespace asset {
 class ModelCache;
 }
@@ -27,12 +30,15 @@ class LockstepSession;
 namespace mealkit::game {
 
 struct GameContext {
-    Window& window; // 입력: window.input()
+    Window& window; // 창 (커서 잡기, 포커스). 게임 입력은 actions
     render::Renderer& renderer;
     asset::ModelCache& models;
     net::LockstepSession& session;
     audio::Engine& audio; // 소리 이벤트 재생 (mealkit/audio/Audio.h). 장치가 없으면 호출이 아무 일도 하지 않는다
     feedback::Player& feedback; // 이벤트 → 연출 표 (mealkit/feedback/Feedback.h): 틱 이벤트마다 trigger, 카메라 흔들림, 화면 정지
+    // 입력 액션 (mealkit/input/Actions.h, assets/input.bindings): 키를 직접 보지 않고 actions.axis2("move")처럼 읽는다.
+    // 엔진이 매 프레임 update 전에 갱신한다(허용되지 않은 장치는 놓은 상태). window.input()은 엔진·디버그 키 전용.
+    input::Actions& actions;
 
     // 엔진이 매 프레임 정하는 값
     render::Viewport viewport{}; // 게임 화면 영역 (에디터에서는 씬 뷰)

@@ -55,5 +55,7 @@ bool loadGameProject(ProjectFile& out, const reflect::TypeInfo* gameType = nullp
 
 // 시작 씬의 findAsset 경로 ("assets/scenes/arena.scene")
 inline std::string startSceneAsset(const ProjectSettings& settings) { return "assets/" + settings.scene; }
+// 플레이어별 파일 폴더 (바꾼 키, 설정, 세이브): 사용자 앱 데이터 폴더/<게임 이름>. 콘텐츠 해시와 무관하다.
+std::string userFolder(const ProjectSettings& settings);
 
 } // namespace mealkit::game

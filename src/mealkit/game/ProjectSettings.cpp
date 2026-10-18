@@ -103,4 +103,8 @@ bool loadGameProject(ProjectFile& out, const reflect::TypeInfo* gameType, void* 
     return true;
 }
 
+std::string userFolder(const ProjectSettings& settings) {
+    return userDataDirectory() + "/" + (settings.name.empty() ? std::string("MealKitGame") : settings.name);
+}
+
 } // namespace mealkit::game

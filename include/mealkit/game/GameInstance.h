@@ -26,8 +26,9 @@ namespace mealkit::game {
 // DLL 경계의 약속이 바뀌면 올린다. 에디터는 번호가 다른 게임 DLL을 불러오지 않는다.
 // 2: GameContext, 3: 게임 오브젝트 종류, 4: 튜닝, 5: 상태 보기, 6: 디버그 제어, 7: 프로젝트 설정·문자열 필드, 8: 해시 로그·입력 기록,
 // 9: 화면용 튜닝(ViewTuningType, GameContext::viewTuning)·Ticks·Color 필드, 10: 정의 데이터 표(MEALKIT_TABLE, RowRef),
-// 11: 소리(GameContext::audio), FrameParams::cameraForward, 12: 연출 표(GameContext::feedback, EventType), MEALKIT_ENUM
-inline constexpr u32 kApiVersion = 12;
+// 11: 소리(GameContext::audio), FrameParams::cameraForward, 12: 연출 표(GameContext::feedback, EventType), MEALKIT_ENUM,
+// 13: 입력 액션(GameContext::actions)
+inline constexpr u32 kApiVersion = 13;
 
 struct PlayOptions {
     bool bot = false;    // 스크립트 입력 (자동 테스트)
