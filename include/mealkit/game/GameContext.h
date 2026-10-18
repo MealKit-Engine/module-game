@@ -10,6 +10,9 @@ class Window;
 namespace audio {
 class Engine;
 }
+namespace feedback {
+class Player;
+}
 namespace asset {
 class ModelCache;
 }
@@ -29,6 +32,7 @@ struct GameContext {
     asset::ModelCache& models;
     net::LockstepSession& session;
     audio::Engine& audio; // 소리 이벤트 재생 (mealkit/audio/Audio.h). 장치가 없으면 호출이 아무 일도 하지 않는다
+    feedback::Player& feedback; // 이벤트 → 연출 표 (mealkit/feedback/Feedback.h): 틱 이벤트마다 trigger, 카메라 흔들림, 화면 정지
 
     // 엔진이 매 프레임 정하는 값
     render::Viewport viewport{}; // 게임 화면 영역 (에디터에서는 씬 뷰)
