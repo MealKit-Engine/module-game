@@ -41,7 +41,9 @@ bool parseHeadlessArgs(int argc, char** argv, HeadlessOptions& o) {
         };
         auto hasValue = [&] { return i + 1 < argc && argv[i + 1][0] != '-'; };
         const char* v = nullptr;
-        if (a == "--headless" || a == "--bot" || a == "--debug" || a == "--mute") continue;
+        if (a == "--headless" || a == "--bot" || a == "--debug" || a == "--mute" ||
+            a == "--debug-ui")
+            continue;
         if (a == "--host") {
             o.mode = HeadlessOptions::Mode::Host;
             if (hasValue()) o.port = static_cast<u16>(std::atoi(argv[++i]));

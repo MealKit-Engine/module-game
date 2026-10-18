@@ -27,8 +27,8 @@ namespace mealkit::game {
 // 2: GameContext, 3: 게임 오브젝트 종류, 4: 튜닝, 5: 상태 보기, 6: 디버그 제어, 7: 프로젝트 설정·문자열 필드, 8: 해시 로그·입력 기록,
 // 9: 화면용 튜닝(ViewTuningType, GameContext::viewTuning)·Ticks·Color 필드, 10: 정의 데이터 표(MEALKIT_TABLE, RowRef),
 // 11: 소리(GameContext::audio), FrameParams::cameraForward, 12: 연출 표(GameContext::feedback, EventType), MEALKIT_ENUM,
-// 13: 입력 액션(GameContext::actions)
-inline constexpr u32 kApiVersion = 13;
+// 13: 입력 액션(GameContext::actions), 14: 디버그 UI(GameInstance::debugUi, 에디터와 게임 DLL이 mealkit.dll의 ImGui 하나를 쓴다)
+inline constexpr u32 kApiVersion = 14;
 
 struct PlayOptions {
     bool bot = false;    // 스크립트 입력 (자동 테스트)
@@ -69,6 +69,10 @@ public:
     virtual reflect::View stateView() const = 0;
     // 일시정지·되감기·그림자 시뮬레이션 (game::Simulation이 구현한다). 없으면 nullptr.
     virtual SimDebug* debug() { return nullptr; }
+    // 디버그 UI (개발 빌드·에디터, docs/CODING_MODEL.md "코드로 짜는 UI"): ImGui 프레임 안에서 부른다. 몸은 #if MEALKIT_DEBUG_UI로 감싼다
+    // (출시 빌드에는 ImGui가 없다). 시뮬레이션을 바꾸는 버튼은 상태를 고치지 않고 확정 명령(mealkit/sim/Commands.h)을 보낸다.
+    // 출시 exe는 F1로 켜고 끈다. 에디터는 플레이 중 항상 부른다.
+    virtual void debugUi(GameContext& ctx) { (void)ctx; }
 };
 
 // 게임 DLL이 내보내는 정보. 에디터가 mealkitGetGameModule()로 받는다.
