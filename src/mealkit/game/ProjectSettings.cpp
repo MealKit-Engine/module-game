@@ -3,6 +3,7 @@
 #include "mealkit/core/Log.h"
 #include "mealkit/platform/Paths.h"
 
+#include <algorithm>
 #include <cstring>
 
 namespace mealkit::game {
@@ -101,6 +102,15 @@ bool loadGameProject(ProjectFile& out, const reflect::TypeInfo* gameType, void* 
     }
     if (gameType && gameData) applyGameSettings(out, *gameType, gameData);
     return true;
+}
+
+net::AutoDelay autoDelayOf(const ProjectSettings& s, f32 tickMs) {
+    net::AutoDelay a;
+    a.enabled = s.inputDelayAuto;
+    a.tickMs = tickMs;
+    a.minTicks = std::max(1u, static_cast<u32>(static_cast<f32>(s.inputDelayMinMs) / tickMs + 0.5f));
+    a.maxTicks = std::max(a.minTicks, static_cast<u32>(static_cast<f32>(s.inputDelayMaxMs) / tickMs + 0.5f));
+    return a;
 }
 
 std::string userFolder(const ProjectSettings& settings) {

@@ -19,6 +19,7 @@ void MatchService::init(const MatchServiceConfig& config) {
     m_session.setContentHash(config.contentHash);
     m_session.setAcceptOtherBuilds(config.acceptOtherBuilds);
     m_session.setConditions(config.conditions);
+    m_session.setAutoDelay(config.autoDelay);
     std::string name = config.playerName;
     if (name.empty() && config.online && config.online->available()) name = config.online->displayName();
     if (name.empty()) name = userName();
@@ -121,6 +122,16 @@ MatchPhase MatchService::phase() const {
     case net::SessionState::Ended: return MatchPhase::Ended;
     }
     return MatchPhase::Menu;
+}
+
+u32 MatchService::slowPlayers() const {
+    if (!m_config.autoDelay.enabled) return 0;
+    u32 mask = 0;
+    for (const net::LobbyMember& m : m_session.lobbyMembers())
+        if (m.player < 32 && static_cast<f32>(m.pingMs) * 1.25f + m_config.autoDelay.tickMs >
+                                 m_config.autoDelay.tickMs * static_cast<f32>(m_config.autoDelay.maxTicks))
+            mask |= 1u << m.player;
+    return mask;
 }
 
 void MatchService::setBrowsing(bool on) {

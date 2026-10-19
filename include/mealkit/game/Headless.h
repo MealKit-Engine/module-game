@@ -129,6 +129,9 @@ int runHeadless(int argc, char** argv) {
     session.setContentHash(data.contentHash);
     session.setAcceptOtherBuilds(options.anyBuild);
     session.setConditions({options.netLagMs, options.netJitterMs, options.netLossPercent});
+    net::AutoDelay autoDelay = autoDelayOf(data.project.settings, 1000.0f / static_cast<f32>(reflect::tickRate()));
+    autoDelay.enabled = autoDelay.enabled && !options.delayGiven; // --delay: 고정
+    session.setAutoDelay(autoDelay);
     const u64 seed = options.seed ? options.seed : static_cast<u64>(std::time(nullptr));
     auto loadout = [&] {
         if constexpr (requires { Game::botLoadout(u8{0}, session); }) Game::botLoadout(session.localPlayer(), session);

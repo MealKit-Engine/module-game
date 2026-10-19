@@ -180,6 +180,8 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
         c.loopbackOnly = opt.loopbackOnly;
         c.seed = opt.seed;
         c.conditions = {opt.netLagMs, opt.netJitterMs, opt.netLossPercent};
+        c.autoDelay = autoDelayOf(project.settings, 1000.0f / static_cast<f32>(reflect::tickRate()));
+        c.autoDelay.enabled = c.autoDelay.enabled && !opt.delayGiven; // --delay: 고정
         c.online = online.available() ? &online : nullptr;
         matches.init(c);
     }

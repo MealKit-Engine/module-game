@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mealkit/core/Reflect.h"
+#include "mealkit/net/Lockstep.h"
 
 #include <string>
 
@@ -33,6 +34,10 @@ MEALKIT_STRUCT(ProjectSettings) {
                         reflect::kFieldView | reflect::kFieldReadOnly);
     MEALKIT_VIEW_FIELD(u32, audioVoices, 32, "Sound voices mixed at once");
     MEALKIT_VIEW_FIELD(std::string, language, "ko", "Default language (assets/strings/<language>.txt)");
+    // 입력 지연 자동 조절 (호스트가 정한다, 피어마다 같을 필요가 없어 해시 밖). 지금은 PC(유선) 값, 다른 플랫폼은 5단계에서 종류별로
+    MEALKIT_VIEW_FIELD(bool, inputDelayAuto, true, "Choose the input delay from the players' ping");
+    MEALKIT_VIEW_FIELD(u32, inputDelayMinMs, 60, "Shortest input delay (ms)");
+    MEALKIT_VIEW_FIELD(u32, inputDelayMaxMs, 270, "Longest input delay (ms, slower players are warned in the lobby)");
 };
 
 struct ProjectFile {
@@ -53,6 +58,9 @@ void applyGameSettings(const ProjectFile& project, const reflect::TypeInfo& game
 // 게임 실행 파일용: 실행 파일 폴더(출시본)나 그 위(개발 중)에서 mealkit.project를 찾아 읽고 게임 항목을 gameData에 넣는다.
 // 파일이 없으면 기본값 그대로 두고 false (경고 로그).
 bool loadGameProject(ProjectFile& out, const reflect::TypeInfo* gameType = nullptr, void* gameData = nullptr);
+
+// 프로젝트 설정의 입력 지연 범위를 틱으로 (tickMs: 한 틱 ms)
+net::AutoDelay autoDelayOf(const ProjectSettings& settings, f32 tickMs);
 
 // 시작 씬의 findAsset 경로 ("assets/scenes/arena.scene")
 inline std::string startSceneAsset(const ProjectSettings& settings) { return "assets/" + settings.scene; }

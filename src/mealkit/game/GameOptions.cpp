@@ -20,7 +20,7 @@ void printGameUsage(const char* name, bool headless) {
                 "  --players <n>          max players when hosting (default: the game's default, max 8)\n"
                 "  --auto-start <n>       host: start when n players are in the lobby%s\n"
                 "  --match-data <n>       match setting chosen by the host and sent to everyone (the game decides; alias --bodies)\n"
-                "  --delay <ticks>        input delay in ticks (default 3)\n"
+                "  --delay <ticks>        fixed input delay in ticks (default: automatic from the players' ping, mealkit.project)\n"
                 "  --seed <n>             world seed\n"
                 "  --threads <n>          physics worker threads (default: auto)\n"
                 "  --scene <file>         scene to play (default: scene in mealkit.project)\n"
@@ -88,7 +88,7 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
         else if (a == "--players" && next(v)) o.maxPlayers = u32Of(v);
         else if (a == "--auto-start" && next(v)) o.autoStart = u32Of(v);
         else if ((a == "--match-data" || a == "--bodies") && next(v)) o.matchData = u32Of(v);
-        else if (a == "--delay" && next(v)) o.inputDelay = u32Of(v);
+        else if (a == "--delay" && next(v)) o.inputDelay = u32Of(v), o.delayGiven = true;
         else if (a == "--seed" && next(v)) o.seed = std::strtoull(v, nullptr, 10);
         else if (a == "--threads" && next(v)) o.physicsThreads = u32Of(v);
         else if (a == "--scene" && next(v)) o.scenePath = v;

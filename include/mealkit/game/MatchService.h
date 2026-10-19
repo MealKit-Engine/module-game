@@ -40,6 +40,7 @@ struct MatchServiceConfig {
     u64 seed = 0;                // 0이면 매치마다 현재 시각. 주면 첫 매치가 이 값, 다음 매치는 +1 (시험 재현)
     online::Service* online = nullptr; // Steam 로비 (없거나 init 실패면 IP·LAN만)
     net::NetConditions conditions; // 네트워크 상태 흉내 (--net-lag/--net-jitter/--net-loss)
+    net::AutoDelay autoDelay;      // 입력 지연 자동 조절 (꺼져 있으면 inputDelay 고정)
     std::string playerName; // 로비에 보이는 이름 (비어 있으면 온라인 계정 이름, 그것도 없으면 이 컴퓨터의 사용자 이름)
 };
 
@@ -86,6 +87,9 @@ public:
     bool isHost() const { return m_session.isHost(); }
     bool isOffline() const { return m_session.isOffline(); }
     u16 port() const { return m_port; }
+
+    // 로비에서 핑이 입력 지연 상한보다 큰 사람 (비트 = 플레이어 번호): 매치 중 멈칫거린다. 화면이 경고한다
+    u32 slowPlayers() const;
 
     // LAN 방 찾기: 참가 메뉴가 열려 있는 동안 켠다
     void setBrowsing(bool on);
