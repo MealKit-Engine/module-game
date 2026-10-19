@@ -68,6 +68,7 @@ bool loadMatchData(const GameTypes& types, const MatchDataOptions& options, asse
     } else {
         loadGameProject(out.project, types.projectSettingsType, out.gameProject.data());
     }
+    applyTickRate(out.project.settings); // 시간 필드(튜닝·씬·표의 초)를 이 틱레이트로 읽는다
     if (options.scene) {
         out.scene = *options.scene;
     } else {

@@ -21,7 +21,8 @@ struct MatchOptions {
     u32 maxPlayers = 0;     // 0 = 게임 defaults()
     u32 autoStart = 0;      // 호스트: 이 인원이 모이면 시작 (헤드리스는 0 = maxPlayers)
     u32 matchData = 0;      // 게임이 정하는 매치 설정값 (호스트가 정해 모두에게 보낸다. sandbox: 상자 수, 0 = 씬)
-    u32 inputDelay = 3;     // 틱 (--delay를 주면 고정, 주지 않으면 프로젝트 설정의 자동 조절)
+    u32 inputDelayMs = 100; // --delay <ms>: 주면 고정, 주지 않으면 프로젝트 설정의 자동 조절 (이 값은 처음 값)
+    u32 inputDelay = 3;     // 틱 (프로젝트를 읽은 뒤 inputDelayMs와 틱레이트로 정한다)
     bool delayGiven = false;
     u64 seed = 0;           // 0 = 현재 시각
     u32 physicsThreads = 0; // 0 = 자동

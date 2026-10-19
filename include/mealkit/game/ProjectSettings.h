@@ -3,6 +3,8 @@
 #include "mealkit/core/Reflect.h"
 #include "mealkit/net/Lockstep.h"
 
+#include <algorithm>
+
 #include <string>
 
 // 프로젝트 설정: 프로젝트 폴더 최상위의 mealkit.project (docs/CODING_MODEL.md "프로젝트 단위 설정").
@@ -33,6 +35,9 @@ MEALKIT_STRUCT(ProjectSettings) {
     MEALKIT_FIELD_FLAGS(std::string, created, {}, "Development started (YYYY-MM-DD)",
                         reflect::kFieldView | reflect::kFieldReadOnly);
     MEALKIT_VIEW_FIELD(u32, audioVoices, 32, "Sound voices mixed at once");
+    // 시뮬레이션 틱레이트 (콘텐츠 해시에 들어간다). 시간 값은 데이터에 초로 적혀 있어 바꿔도 튜닝·표를 고치지 않는다.
+    // 60은 반응·충돌이 좋아지지만 시뮬레이션 CPU와 입력 패킷이 2배다 (물체 수천 개짜리 게임에는 쓰지 않는다)
+    MEALKIT_FIELD(u32, tickRate, 30, "Simulation ticks per second (30 or 60)");
     MEALKIT_VIEW_FIELD(std::string, language, "ko", "Default language (assets/strings/<language>.txt)");
     // 입력 지연 자동 조절 (호스트가 정한다, 피어마다 같을 필요가 없어 해시 밖). 지금은 PC(유선) 값, 다른 플랫폼은 5단계에서 종류별로
     MEALKIT_VIEW_FIELD(bool, inputDelayAuto, true, "Choose the input delay from the players' ping");
@@ -58,6 +63,14 @@ void applyGameSettings(const ProjectFile& project, const reflect::TypeInfo& game
 // 게임 실행 파일용: 실행 파일 폴더(출시본)나 그 위(개발 중)에서 mealkit.project를 찾아 읽고 게임 항목을 gameData에 넣는다.
 // 파일이 없으면 기본값 그대로 두고 false (경고 로그).
 bool loadGameProject(ProjectFile& out, const reflect::TypeInfo* gameType = nullptr, void* gameData = nullptr);
+
+// 프로젝트의 틱레이트를 프로세스 틱레이트로 (reflect::setTickRate, 10..120). 시간 필드(Ticks)를 읽기 전에 부른다.
+// loadGameProject·loadMatchData·에디터의 프로젝트 열기가 부른다
+void applyTickRate(const ProjectSettings& settings);
+// 한 틱의 길이 (초, 프로세스 틱레이트)
+inline f32 tickDt() { return 1.0f / static_cast<f32>(reflect::tickRate()); }
+// 밀리초를 틱으로 (반올림, 1 이상)
+inline u32 msToTicks(u32 ms) { return std::max(1u, static_cast<u32>(static_cast<f32>(ms) * static_cast<f32>(reflect::tickRate()) / 1000.0f + 0.5f)); }
 
 // 프로젝트 설정의 입력 지연 범위를 틱으로 (tickMs: 한 틱 ms)
 net::AutoDelay autoDelayOf(const ProjectSettings& settings, f32 tickMs);

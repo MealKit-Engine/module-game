@@ -28,7 +28,6 @@
 //   using World = ...;                  // game::Simulation의 World 약속 (state, step, hash)
 //   using TuningType = ...;             // assets/game.tuning
 //   using ProjectSettingsType = ...;    // (선택) mealkit.project의 game.* 항목
-//   static constexpr f32 kTickDt;
 //   static void startWorld(World&, const game::MatchInfo&, const TuningType&, const scene::Scene& flatScene,
 //                          asset::ModelCache&, u32 physicsThreads);   // 매치 시작 (GameSession도 같은 함수를 쓴다)
 //   static net::PlayerInput botInput(u32 tick, u8 player);            // --bot 입력 (GameSession도 같은 함수를 쓴다)
@@ -110,6 +109,7 @@ int runHeadless(int argc, char** argv) {
     asset::ModelCache models; // CPU 데이터만 (렌더러 없음)
     MatchData data;
     if (!loadMatchData(types, {options.scenePath, options.tuningPath}, models, data)) return 1;
+    options.inputDelay = msToTicks(options.inputDelayMs); // 틱레이트(프로젝트 설정)를 안 뒤
     const Tuning& tuning = *static_cast<const Tuning*>(data.tuning.data());
     if constexpr (kHasGameProject)
         if constexpr (requires { Game::defaults(options, std::declval<const GameProject&>()); })
@@ -153,7 +153,7 @@ int runHeadless(int argc, char** argv) {
     // 혼자면 쉬지 않고 돈다. 네트워크면 이번 반복에 틱이 나아가지 않았을 때만(입력 대기) 1ms 잔다.
     // 바쁜 대기를 하면 코어가 적은 PC(CI 러너)에서 여러 피어의 물리 작업 스레드가 돌 시간을 뺏는다.
     const u32 autoStart = options.autoStart ? options.autoStart : options.maxPlayers;
-    const f64 frameDt = static_cast<f64>(Game::kTickDt) * Simulation<World>::kCatchUpTicks; // 한 번에 최대한 따라잡는다
+    const f64 frameDt = static_cast<f64>(tickDt()) * Simulation<World>::kCatchUpTicks; // 한 번에 최대한 따라잡는다
     int exitCode = 0;
     f64 exitDeadline = 0.0;
     for (;;) {
@@ -169,7 +169,7 @@ int runHeadless(int argc, char** argv) {
             break;
         }
         if (!sim.started() && session.state() == net::SessionState::Running) {
-            sim.start(play, Game::kTickDt, [&](World& world, u32 physicsThreads) {
+            sim.start(play, tickDt(), [&](World& world, u32 physicsThreads) {
                 start(world, matchInfo(session), physicsThreads);
             });
             MEALKIT_INFO("Headless match: %u player(s), you are player %u, match data %u", session.playerCount(),

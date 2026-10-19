@@ -104,6 +104,12 @@ bool loadGameProject(ProjectFile& out, const reflect::TypeInfo* gameType, void* 
     return true;
 }
 
+void applyTickRate(const ProjectSettings& settings) {
+    const u32 rate = std::clamp(settings.tickRate, 10u, 120u);
+    if (rate != settings.tickRate) MEALKIT_WARN("tickRate %u in mealkit.project is out of range - using %u", settings.tickRate, rate);
+    reflect::setTickRate(rate);
+}
+
 net::AutoDelay autoDelayOf(const ProjectSettings& s, f32 tickMs) {
     net::AutoDelay a;
     a.enabled = s.inputDelayAuto;

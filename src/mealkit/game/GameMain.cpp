@@ -157,6 +157,7 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
         MEALKIT_FATAL("Cannot load the match data (see log)");
     const ProjectFile& project = data.project;
     if (spec.defaults && data.gameProject.data()) spec.defaults(opt, data.gameProject.data()); // 헤드리스와 같은 기본값 (포트·인원)
+    opt.inputDelay = msToTicks(opt.inputDelayMs); // 틱레이트(프로젝트 설정)를 안 뒤
     const scene::Scene& scene = data.scene;
 
     // 온라인 서비스(Steam): 빌드에 들어 있으면 시작할 때 로그인한다 (메뉴의 [Steam 방 만들기], 친구 초대 수락)
