@@ -2,7 +2,7 @@
 
 #include "mealkit/asset/ModelCache.h"
 #include "mealkit/core/Log.h"
-#include "mealkit/game/Tables.h"
+#include "mealkit/data/Tables.h"
 #include "mealkit/platform/Paths.h"
 
 namespace mealkit::game {
@@ -70,7 +70,7 @@ u64 contentHash(const scene::Scene& scene, asset::ModelCache& models, const scen
     if (project.type && project.data) reflect::hashStruct(*project.type, project.data, h, reflect::kFieldView);
     if (gameProject.type && gameProject.data)
         reflect::hashStruct(*gameProject.type, gameProject.data, h, reflect::kFieldView);
-    if (tables) hashTables(*tables, h);
+    if (tables) data::hashTables(*tables, h);
     return h.value;
 }
 
