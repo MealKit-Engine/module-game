@@ -130,6 +130,24 @@ const reflect::TypeInfo* gameEventType() {
         return nullptr;
 }
 
+// 게임 클래스의 모듈 정보 (MEALKIT_GAME_MODULE: 에디터용 DLL, MEALKIT_GAME_MAIN: 출시 exe가 같은 것을 쓴다)
+template <class GameClass>
+const GameModule& gameModuleOf(const char* name) {
+    static const GameModule module{
+        kApiVersion,
+        name,
+        []() -> GameInstance* { return new GameClass(); },
+        [](GameInstance* g) { delete g; },
+        []() -> const std::vector<const reflect::TypeInfo*>* { return &reflect::moduleObjectTypes(); },
+        []() -> const reflect::TypeInfo* { return &reflect::typeOf<typename GameClass::TuningType>(); },
+        &gameProjectSettingsType<GameClass>,
+        &gameViewTuningType<GameClass>,
+        []() -> const reflect::TableList* { return &reflect::moduleTables(); },
+        &gameEventType<GameClass>,
+        []() -> const std::vector<const reflect::TypeInfo*>* { return &reflect::moduleViewModels(); }};
+    return module;
+}
+
 using GetGameModuleFn = const GameModule* (*)();
 inline constexpr const char* kGetGameModuleSymbol = "mealkitGetGameModule";
 
@@ -138,23 +156,5 @@ inline constexpr const char* kGetGameModuleSymbol = "mealkitGetGameModule";
 // 게임 DLL에서 한 번 쓴다: MEALKIT_GAME_MODULE("Sandbox", sandbox::GameSession)
 #define MEALKIT_GAME_MODULE(NameLiteral, GameClass)                                                                    \
     extern "C" __declspec(dllexport) const ::mealkit::game::GameModule* mealkitGetGameModule() {                       \
-        static const ::mealkit::game::GameModule module{                                                               \
-            ::mealkit::game::kApiVersion,                                                                              \
-            NameLiteral,                                                                                               \
-            []() -> ::mealkit::game::GameInstance* { return new GameClass(); },                                        \
-            [](::mealkit::game::GameInstance* g) { delete g; },                                                        \
-            []() -> const std::vector<const ::mealkit::reflect::TypeInfo*>* {                                          \
-                return &::mealkit::reflect::moduleObjectTypes();                                                       \
-            },                                                                                                         \
-            []() -> const ::mealkit::reflect::TypeInfo* {                                                              \
-                return &::mealkit::reflect::typeOf<typename GameClass::TuningType>();                                  \
-            },                                                                                                         \
-            &::mealkit::game::gameProjectSettingsType<GameClass>,                                                      \
-            &::mealkit::game::gameViewTuningType<GameClass>,                                                           \
-            []() -> const ::mealkit::reflect::TableList* { return &::mealkit::reflect::moduleTables(); },              \
-            &::mealkit::game::gameEventType<GameClass>,                                                                \
-            []() -> const std::vector<const ::mealkit::reflect::TypeInfo*>* {                                          \
-                return &::mealkit::reflect::moduleViewModels();                                                        \
-            }};                                                                                                        \
-        return &module;                                                                                                \
+        return &::mealkit::game::gameModuleOf<GameClass>(NameLiteral);                                                 \
     }
