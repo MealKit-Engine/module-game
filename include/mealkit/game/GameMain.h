@@ -15,7 +15,7 @@ namespace mealkit::game {
 struct GameMainSpec {
     const GameModule* module = nullptr;
     // (선택) 헤드리스 클래스의 defaults: 포트·인원 기본값 (gameProject는 GameModule::projectSettingsType의 값)
-    void (*defaults)(HeadlessOptions& options, const void* gameProject) = nullptr;
+    void (*defaults)(MatchOptions& options, const void* gameProject) = nullptr;
 };
 
 int runGame(int argc, char** argv, const GameMainSpec& spec);
@@ -29,8 +29,8 @@ GameMainSpec gameMainSpec(const char* name) {
         if constexpr (requires { typename GameClass::ProjectSettingsType; })
             static_assert(std::is_same_v<Project, typename GameClass::ProjectSettingsType>,
                           "GameClass and HeadlessClass must use the same ProjectSettingsType");
-        if constexpr (requires(HeadlessOptions& o, const Project& p) { HeadlessClass::defaults(o, p); })
-            spec.defaults = [](HeadlessOptions& o, const void* p) {
+        if constexpr (requires(MatchOptions& o, const Project& p) { HeadlessClass::defaults(o, p); })
+            spec.defaults = [](MatchOptions& o, const void* p) {
                 HeadlessClass::defaults(o, *static_cast<const Project*>(p));
             };
     }

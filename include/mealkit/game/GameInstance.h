@@ -3,6 +3,7 @@
 #include "mealkit/core/Reflect.h"
 #include "mealkit/core/Types.h"
 #include "mealkit/game/GameContext.h"
+#include "mealkit/game/GameData.h"
 #include "mealkit/game/SimDebug.h"
 #include "mealkit/render/Renderer.h"
 
@@ -103,6 +104,16 @@ struct GameModule {
     // 게임이 MEALKIT_VIEWMODEL로 선언한 뷰 모델 (에디터 [UI] 미리보기의 가짜 값, 바인딩 검사). DLL을 내리면 무효가 된다.
     const std::vector<const reflect::TypeInfo*>* (*viewModels)() = nullptr;
 };
+
+// 매치 데이터를 읽을 때 쓰는 게임 타입 (game::loadMatchData)
+inline GameTypes gameTypes(const GameModule& module) {
+    GameTypes t;
+    t.objectTypes = module.objectTypes ? module.objectTypes() : nullptr;
+    t.tuningType = module.tuningType ? module.tuningType() : nullptr;
+    t.projectSettingsType = module.projectSettingsType ? module.projectSettingsType() : nullptr;
+    t.tables = module.tables ? module.tables() : nullptr;
+    return t;
+}
 
 // GameClass::ProjectSettingsType이 있으면 그 타입 (MEALKIT_GAME_MODULE이 쓴다)
 template <class GameClass>

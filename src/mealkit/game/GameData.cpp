@@ -60,6 +60,39 @@ bool LiveTuning::poll(f64 now) {
     return true;
 }
 
+bool loadMatchData(const GameTypes& types, const MatchDataOptions& options, asset::ModelCache& models, MatchData& out) {
+    out.gameProject = types.projectSettingsType ? reflect::Instance(*types.projectSettingsType) : reflect::Instance();
+    if (options.project) {
+        out.project = *options.project;
+        if (types.projectSettingsType) applyGameSettings(out.project, *types.projectSettingsType, out.gameProject.data());
+    } else {
+        loadGameProject(out.project, types.projectSettingsType, out.gameProject.data());
+    }
+    if (options.scene) {
+        out.scene = *options.scene;
+    } else {
+        const std::string scenePath =
+            options.scenePath.empty() ? findAsset(startSceneAsset(out.project.settings)) : options.scenePath;
+        if (!scenePath.empty()) {
+            std::string error;
+            if (!scene::load(out.scene, scenePath, &error)) {
+                MEALKIT_ERROR("Cannot load scene %s: %s", scenePath.c_str(), error.c_str());
+                return false;
+            }
+            MEALKIT_INFO("Scene: %s (%zu entities)", scenePath.c_str(), out.scene.entities.size());
+        } else {
+            out.scene = scene::makeDefault();
+            MEALKIT_INFO("Scene file not found - using the built-in arena");
+        }
+    }
+    out.tuning = types.tuningType ? reflect::Instance(*types.tuningType) : reflect::Instance();
+    if (types.tuningType) loadTuning(*types.tuningType, out.tuning.data(), options.tuningPath);
+    out.contentHash = contentHash(out.scene, models, types.objectTypes, types.tuningType, out.tuning.data(),
+                                  {&reflect::typeOf<ProjectSettings>(), &out.project.settings},
+                                  {types.projectSettingsType, out.gameProject.data()}, types.tables);
+    return true;
+}
+
 u64 contentHash(const scene::Scene& scene, asset::ModelCache& models, const scene::TypeList* gameTypes,
                 const reflect::TypeInfo* tuningType, const void* tuning, reflect::View project,
                 reflect::View gameProject, const reflect::TableList* tables) {

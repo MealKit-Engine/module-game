@@ -4,10 +4,13 @@
 #include "mealkit/core/Clock.h"
 #include "mealkit/core/Log.h"
 #include "mealkit/core/Reflect.h"
+#include "mealkit/game/GameData.h"
+#include "mealkit/game/GameOptions.h"
 #include "mealkit/game/InputRecord.h"
 #include "mealkit/game/ProjectSettings.h"
 #include "mealkit/game/Simulation.h"
 #include "mealkit/net/Lockstep.h"
+#include "mealkit/platform/System.h"
 #include "mealkit/scene/Scene.h"
 
 #include <cstdio>
@@ -31,44 +34,11 @@
 //   static net::PlayerInput botInput(u32 tick, u8 player);            // --bot 입력 (GameSession도 같은 함수를 쓴다)
 //   static void botCommands(u32 tick, u8 player, net::LockstepSession&); // (선택) --bot 확정 명령 (mealkit/sim/Commands.h)
 //   static void botLoadout(u8 player, net::LockstepSession&);       // (선택) 봇의 매치 시작 데이터 (mealkit/game/Loadout.h)
-//   static void defaults(game::HeadlessOptions&, const ProjectSettingsType&); // (선택) 포트·인원·매치 데이터 기본값
+//   static void defaults(game::MatchOptions&, const ProjectSettingsType&); // (선택) 포트·인원·매치 데이터 기본값
 namespace mealkit::game {
 
-struct HeadlessOptions {
-    enum class Mode { Offline, Host, Join } mode = Mode::Offline;
-    u16 port = 0; // 0 = 게임 defaults()가 정한다
-    std::string joinAddress;
-    bool loopbackOnly = false;
-    u32 maxPlayers = 0;
-    u32 autoStart = 0; // 호스트: 이 인원이 모이면 시작 (0 = maxPlayers)
-    u32 matchData = 0; // 게임이 정하는 매치 설정값 (sandbox: 상자 수)
-    u32 inputDelay = 3;
-    u64 seed = 0; // 0 = 현재 시각
-    u32 physicsThreads = 0;
-    u32 exitTick = 0; // 재생이 아니면 필수
-    bool shadow = false;
-    bool anyBuild = false;
-    std::string scenePath, tuningPath;
-    std::string hashLogPath, recordInputsPath, replayInputsPath;
-};
-
-bool parseHeadlessArgs(int argc, char** argv, HeadlessOptions& out);
-void printHeadlessUsage();
-
-// 매치 데이터: 씬(콘텐츠 해시용 원본, 시뮬레이션용 평평한 목록), 모델(CPU 데이터만), 프로젝트 설정, 콘텐츠 해시
-struct HeadlessData {
-    ProjectFile project;
-    scene::Scene scene;
-    scene::Scene flatScene;
-    asset::ModelCache models;
-    u64 contentHash = 0;
-};
-
-// 실패하면 로그를 남기고 false. tuning·gameProject는 게임 타입의 값 (gameProjectType이 없으면 nullptr).
-bool loadHeadlessData(const HeadlessOptions& options, const reflect::TypeInfo& tuningType, void* tuning,
-                      const reflect::TypeInfo* gameProjectType, void* gameProject, HeadlessData& out);
 // 세션을 연다 (혼자, 방 만들기, 참가). 실패하면 로그를 남기고 false.
-bool startHeadlessSession(net::LockstepSession& session, const HeadlessOptions& options, u64 seed);
+bool startHeadlessSession(net::LockstepSession& session, const MatchOptions& options, u64 seed);
 void printFinal(u32 tick, u64 hash, bool desynced);
 
 template <class Game>
@@ -79,7 +49,7 @@ auto headlessGameProjectSettings() {
 
 // --replay-inputs: 기록된 입력으로 World를 처음부터 다시 돌리고, 틱마다 기록된 해시와 비교한다
 template <class World, class Start>
-int replayHeadless(const HeadlessOptions& options, const HeadlessData& data, Start&& start) {
+int replayHeadless(const MatchOptions& options, u64 contentHash, Start&& start) {
     InputRecording rec;
     std::string error;
     if (!loadInputRecording(options.replayInputsPath, rec, error)) {
@@ -90,7 +60,7 @@ int replayHeadless(const HeadlessOptions& options, const HeadlessData& data, Sta
         MEALKIT_ERROR("Input record %s has no ticks", options.replayInputsPath.c_str());
         return 1;
     }
-    if (rec.contentHash != data.contentHash)
+    if (rec.contentHash != contentHash)
         MEALKIT_WARN("Input record was made with different content (scene, models, tuning or project settings) - "
                      "hashes will differ");
     u32 ticks = static_cast<u32>(rec.inputs.size());
@@ -126,25 +96,30 @@ int runHeadless(int argc, char** argv) {
     constexpr bool kHasGameProject = !std::is_same_v<GameProject, std::monostate>;
 
     log::setDialogs(false);
-    HeadlessOptions options;
-    if (!parseHeadlessArgs(argc, argv, options)) {
-        printHeadlessUsage();
+    MatchOptions options;
+    if (!parseGameArgs(argc, argv, options, nullptr)) {
+        printGameUsage(nullptr, true);
         return 1;
     }
-    Tuning tuning;
-    GameProject gameProject{};
-    const reflect::TypeInfo* gameProjectType = nullptr;
-    if constexpr (kHasGameProject) gameProjectType = &reflect::typeOf<GameProject>();
-    HeadlessData data;
-    if (!loadHeadlessData(options, reflect::typeOf<Tuning>(), &tuning, gameProjectType,
-                          kHasGameProject ? static_cast<void*>(&gameProject) : nullptr, data))
-        return 1;
-    if constexpr (requires { Game::defaults(options, gameProject); }) Game::defaults(options, gameProject);
+    MEALKIT_INFO("CPU: %s", cpuName().c_str()); // 다른 PC 결정론 기록용
+    GameTypes types;
+    types.objectTypes = &reflect::moduleObjectTypes();
+    types.tuningType = &reflect::typeOf<Tuning>();
+    if constexpr (kHasGameProject) types.projectSettingsType = &reflect::typeOf<GameProject>();
+    types.tables = &reflect::moduleTables();
+    asset::ModelCache models; // CPU 데이터만 (렌더러 없음)
+    MatchData data;
+    if (!loadMatchData(types, {options.scenePath, options.tuningPath}, models, data)) return 1;
+    const Tuning& tuning = *static_cast<const Tuning*>(data.tuning.data());
+    if constexpr (kHasGameProject)
+        if constexpr (requires { Game::defaults(options, std::declval<const GameProject&>()); })
+            Game::defaults(options, *static_cast<const GameProject*>(data.gameProject.data()));
+    const scene::Scene flatScene = scene::flattened(data.scene);
 
     auto start = [&](World& world, const MatchInfo& match, u32 physicsThreads) {
-        Game::startWorld(world, match, tuning, data.flatScene, data.models, physicsThreads);
+        Game::startWorld(world, match, tuning, flatScene, models, physicsThreads);
     };
-    if (!options.replayInputsPath.empty()) return replayHeadless<World>(options, data, start);
+    if (!options.replayInputsPath.empty()) return replayHeadless<World>(options, data.contentHash, start);
     if (options.exitTick == 0) {
         MEALKIT_ERROR("Headless runs need --exit-tick <t> (or --replay-inputs <file>)");
         return 1;
@@ -170,7 +145,7 @@ int runHeadless(int argc, char** argv) {
     play.recordInputsPath = options.recordInputsPath;
 
     Simulation<World> sim;
-    const bool offline = options.mode == HeadlessOptions::Mode::Offline;
+    const bool offline = options.mode == MatchOptions::Mode::Offline;
     // 혼자면 쉬지 않고 돈다. 네트워크면 이번 반복에 틱이 나아가지 않았을 때만(입력 대기) 1ms 잔다.
     // 바쁜 대기를 하면 코어가 적은 PC(CI 러너)에서 여러 피어의 물리 작업 스레드가 돌 시간을 뺏는다.
     const u32 autoStart = options.autoStart ? options.autoStart : options.maxPlayers;

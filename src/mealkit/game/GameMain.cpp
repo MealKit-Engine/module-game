@@ -21,6 +21,7 @@
 #include "mealkit/game/FrameStats.h"
 #include "mealkit/game/Frontend.h"
 #include "mealkit/game/GameData.h"
+#include "mealkit/game/GameOptions.h"
 #include "mealkit/game/ProjectSettings.h"
 #include "mealkit/net/Lockstep.h"
 #include "mealkit/net/Socket.h"
@@ -46,143 +47,6 @@
 
 namespace mealkit::game {
 namespace {
-
-struct Options {
-    enum class Mode { Offline, Host, Join, SteamHost, SteamJoin } mode = Mode::Offline;
-    u64 steamLobby = 0;
-    u16 port = 0; // 0 = 게임 defaults() (보통 mealkit.project의 game.defaultPort)
-    std::string joinAddress;
-    std::string scenePath;
-    std::string tuningPath;
-    u32 maxPlayers = 0; // 0 = 게임 defaults()
-    u32 matchData = 0;  // 게임이 정하는 매치 설정값 (호스트가 정한다. sandbox: 상자 수, 0 = 씬의 상자 생성 영역)
-    u32 inputDelay = 3;
-    u64 seed = 0;
-    bool vsync = true;
-    f64 fpsCap = 0.0;
-    u32 width = 1280, height = 720;
-    bool debugLayer = false;
-    bool loopbackOnly = false;
-    u32 physicsThreads = 0;
-    // 자동 테스트용
-    u32 autoStart = 0;
-    u32 exitTick = 0;
-    bool bot = false;
-    bool shadow = false;     // 그림자 시뮬레이션으로 결정론 검사
-    bool rewindTest = false; // 끝날 때 기록을 되감아 다시 돌려 보고 결과를 출력
-    std::string capturePath;
-    u32 captureTick = 0;
-    bool systemInfo = false; // CPU·GPU 정보만 출력하고 끝 (최소 사양 실기 측정 기록용)
-    bool anyBuild = false;   // 호스트가 다른 빌드의 피어도 받는다 (컴파일러 비교 시험)
-    bool mute = false;       // 소리 끄기 (자동 시험에서 여러 창을 띄울 때)
-    bool debugUi = false;    // 디버그 UI(F1)를 켠 채로 시작 (개발 빌드)
-    bool openSettings = false; // 설정 화면을 연 채로 시작 (캡처·시험)
-    bool windowGiven = false; // --size/--vsync/--fps를 줬다: 이번 실행은 플레이어 설정의 화면 항목보다 명령줄
-    std::string language;    // 게임 글자 언어 (비어 있으면 mealkit.project의 language)
-    std::string hashLogPath;      // 틱별 해시 로그 (헤드리스와 비교)
-    std::string recordInputsPath; // 확정된 입력 기록 (<게임>_headless --replay-inputs로 재생)
-};
-
-void printUsage(const char* name) {
-    std::printf("%s (MealKit %s)\n", name, MEALKIT_VERSION);
-    std::printf("  --host [port]          host a match (default: the game's default port, game.defaultPort in mealkit.project)\n"
-                "  --join <addr[:port]>   join a host\n"
-                "  --steam                host a Steam friends-only lobby (invite with I or Shift+Tab)\n"
-                "  --steam-join <lobby>   join a Steam lobby by id (invites from Steam join automatically)\n"
-                "  --scene <file>         scene to play (default: scene in mealkit.project)\n"
-                "  --tuning <file>        tuning values (default assets/game.tuning)\n"
-                "  --players <n>          max players when hosting (default: the game's default, max 8)\n"
-                "  --match-data <n>       match setting chosen by the host and sent to everyone (the game decides; alias --bodies)\n"
-                "  --delay <ticks>        input delay in ticks (default 3)\n"
-                "  --seed <n>             world seed\n"
-                "  --vsync <0|1>          vertical sync (default 1)\n"
-                "  --fps <n>              frame cap when vsync is off\n"
-                "  --size <w> <h>         window size\n"
-                "  --debug                enable the D3D12 debug layer\n"
-                "  --local                host on 127.0.0.1 only (same-PC testing)\n"
-                "  --threads <n>          physics worker threads (default: auto)\n"
-                "  --auto-start <n>       host: start when n players are in the lobby\n"
-                "  --exit-tick <t>        print the state hash after tick t and exit\n"
-                "  --bot                  drive the local player with scripted input\n"
-                "  --shadow               run a shadow simulation and compare state hashes every tick\n"
-                "  --rewind-test          record inputs and snapshots, rewind and replay at the exit tick\n"
-                "  --capture <png> <tick> save a screenshot after the given tick\n"
-                "  --system-info          print CPU/GPU capabilities and exit (exit code 2 if below minimum spec)\n"
-                "  --any-build            host: accept peers running a different build (compiler comparison tests)\n"
-                "  --mute                 start with sound off (automated tests)\n"
-                "  --debug-ui             start with the debug UI shown (F1, development builds)\n"
-                "  --settings             start with the settings screen open\n"
-                "  --lang <code>          language of the game text (assets/strings/<code>.txt, default: language in mealkit.project)\n"
-                "  --hash-log <file>      write \"<tick> <hash>\" for every tick\n"
-                "  --record-inputs <file> save confirmed inputs and hashes (replay: --headless --replay-inputs)\n"
-                "  --headless --help      run without a window (headless options)\n");
-}
-
-bool parseArgs(int argc, char** argv, Options& o) {
-    for (int i = 1; i < argc; ++i) {
-        const std::string a = argv[i];
-        auto next = [&](const char*& out) {
-            if (i + 1 >= argc) return false;
-            out = argv[++i];
-            return true;
-        };
-        auto hasValue = [&] { return i + 1 < argc && argv[i + 1][0] != '-'; };
-        const char* v = nullptr;
-        if (a == "--host") {
-            o.mode = Options::Mode::Host;
-            if (hasValue()) o.port = static_cast<u16>(std::atoi(argv[++i]));
-        } else if (a == "--join" && next(v)) {
-            o.mode = Options::Mode::Join;
-            o.joinAddress = v;
-        } else if (a == "--steam") o.mode = Options::Mode::SteamHost;
-        else if (a == "--steam-join" && next(v)) {
-            o.mode = Options::Mode::SteamJoin;
-            o.steamLobby = std::strtoull(v, nullptr, 10);
-        } else if (a == "+connect_lobby" && next(v)) { // Steam이 친구 초대를 수락했을 때 붙이는 인자
-            o.mode = Options::Mode::SteamJoin;
-            o.steamLobby = std::strtoull(v, nullptr, 10);
-        } else if (a == "--scene" && next(v)) o.scenePath = v;
-        else if (a == "--tuning" && next(v)) o.tuningPath = v;
-        else if (a == "--players" && next(v)) o.maxPlayers = static_cast<u32>(std::atoi(v));
-        else if ((a == "--bodies" || a == "--match-data") && next(v)) o.matchData = static_cast<u32>(std::atoi(v));
-        else if (a == "--delay" && next(v)) o.inputDelay = static_cast<u32>(std::atoi(v));
-        else if (a == "--seed" && next(v)) o.seed = std::strtoull(v, nullptr, 10);
-        else if (a == "--vsync" && next(v)) o.vsync = std::atoi(v) != 0, o.windowGiven = true;
-        else if (a == "--fps" && next(v)) o.fpsCap = std::atof(v), o.windowGiven = true;
-        else if (a == "--size" && i + 2 < argc) {
-            o.windowGiven = true;
-            o.width = static_cast<u32>(std::atoi(argv[++i]));
-            o.height = static_cast<u32>(std::atoi(argv[++i]));
-        } else if (a == "--debug") o.debugLayer = true;
-        else if (a == "--local") o.loopbackOnly = true;
-        else if (a == "--threads" && next(v)) o.physicsThreads = static_cast<u32>(std::atoi(v));
-        else if (a == "--auto-start" && next(v)) o.autoStart = static_cast<u32>(std::atoi(v));
-        else if (a == "--exit-tick" && next(v)) o.exitTick = static_cast<u32>(std::atoi(v));
-        else if (a == "--bot") o.bot = true;
-        else if (a == "--shadow") o.shadow = true;
-        else if (a == "--rewind-test") o.rewindTest = true;
-        else if (a == "--capture" && i + 2 < argc) {
-            o.capturePath = argv[++i];
-            o.captureTick = static_cast<u32>(std::atoi(argv[++i]));
-        } else if (a == "--system-info") o.systemInfo = true;
-        else if (a == "--any-build") o.anyBuild = true;
-        else if (a == "--mute") o.mute = true;
-        else if (a == "--debug-ui") o.debugUi = true;
-        else if (a == "--settings") o.openSettings = true;
-        else if (a == "--lang" && i + 1 < argc) o.language = argv[++i];
-        else if (a == "--hash-log" && next(v)) o.hashLogPath = v;
-        else if (a == "--record-inputs" && next(v)) o.recordInputsPath = v;
-        else if (a == "--help" || a == "-h") return false;
-        else {
-            std::printf("Unknown option: %s\n", a.c_str());
-            return false;
-        }
-    }
-#if defined(MEALKIT_DEBUG)
-    o.debugLayer = true;
-#endif
-    return true;
-}
 
 // 최소 사양 실기 측정 결과를 CHANGELOG에 옮겨 적기 쉬운 모양으로 출력한다.
 int printSystemInfo() {
@@ -213,17 +77,18 @@ int printSystemInfo() {
 }
 
 // --exit-tick에 닿았을 때: 자동 시험이 읽는 줄(FINAL, SHADOW, REWIND)을 쓰고 종료 코드를 돌려준다
-int reportFinish(GameInstance& game, const net::LockstepSession& session, const Options& opt) {
+int reportFinish(GameInstance& game, const net::LockstepSession& session, const MatchOptions& match,
+                 const WindowOptions& win) {
     std::printf("FINAL tick=%u hash=%016llx desync=%d\n", game.nextTick() - 1,
                 static_cast<unsigned long long>(game.stateHash()), session.desynced() ? 1 : 0);
     int exitCode = session.desynced() ? 2 : 0;
-    if (SimDebug* debug = game.debug(); debug && (opt.shadow || opt.rewindTest)) {
-        if (opt.shadow) {
+    if (SimDebug* debug = game.debug(); debug && (match.shadow || win.rewindTest)) {
+        if (match.shadow) {
             const ShadowStatus& shadow = debug->shadow();
             std::printf("SHADOW %s tick=%u\n", shadow.desynced ? "DESYNC" : "ok", shadow.tick);
             if (shadow.desynced) exitCode = 5;
         }
-        if (opt.rewindTest) { // 기록 범위 전체를 조금씩 되감아 다시 돌리고, 현재로 돌아와 해시가 같은지 본다
+        if (win.rewindTest) { // 기록 범위 전체를 조금씩 되감아 다시 돌리고, 현재로 돌아와 해시가 같은지 본다
             const u64 liveHash = game.stateHash();
             debug->setPaused(true);
             const Timeline t = debug->timeline();
@@ -261,115 +126,95 @@ std::string lobbyStatus(const net::LockstepSession& session, const online::Servi
 
 int runGame(int argc, char** argv, const GameMainSpec& spec) {
     const GameModule& module = *spec.module;
-    Options opt;
-    if (!parseArgs(argc, argv, opt)) {
-        printUsage(module.name);
+    MatchOptions match;
+    WindowOptions win;
+    if (!parseGameArgs(argc, argv, match, &win)) {
+        printGameUsage(module.name, false);
         return 1;
     }
-    if (opt.systemInfo) return printSystemInfo();
-    const bool automated = opt.exitTick > 0;
+    if (win.systemInfo) return printSystemInfo();
+    const bool automated = match.exitTick > 0;
     if (automated) log::setDialogs(false);
 
-    // 프로젝트 설정: 출시본은 exe 옆, 개발 중에는 프로젝트 폴더의 mealkit.project
-    ProjectFile project;
-    const reflect::TypeInfo* gameProjectType = module.projectSettingsType ? module.projectSettingsType() : nullptr;
-    reflect::Instance gameProject = gameProjectType ? reflect::Instance(*gameProjectType) : reflect::Instance();
-    loadGameProject(project, gameProjectType, gameProject.data());
     MEALKIT_INFO("CPU: %s", cpuName().c_str()); // 다른 PC 결정론 기록용
-    if (spec.defaults && gameProject.data()) {
-        HeadlessOptions d; // 헤드리스와 같은 기본값 함수 (포트·인원)
-        d.port = opt.port;
-        d.maxPlayers = opt.maxPlayers;
-        spec.defaults(d, gameProject.data());
-        opt.port = d.port;
-        opt.maxPlayers = d.maxPlayers;
-    }
-
-    scene::Scene scene;
-    const std::string scenePath = opt.scenePath.empty() ? findAsset(startSceneAsset(project.settings)) : opt.scenePath;
-    if (!scenePath.empty()) {
-        std::string error;
-        if (!scene::load(scene, scenePath, &error))
-            MEALKIT_FATAL("Cannot load scene %s: %s", scenePath.c_str(), error.c_str());
-        MEALKIT_INFO("Scene: %s (%zu entities)", scenePath.c_str(), scene.entities.size());
-    } else {
-        scene = scene::makeDefault();
-        MEALKIT_INFO("Scene file not found - using the built-in arena");
-    }
-
     Window window;
-    if (!window.create({module.name, opt.width, opt.height})) return 1;
+    if (!window.create({module.name, win.width, win.height})) return 1;
 
     render::Renderer renderer;
-    if (!renderer.init({window.nativeHandle(), window.width(), window.height(), opt.vsync, opt.debugLayer}))
+    if (!renderer.init({window.nativeHandle(), window.width(), window.height(), win.vsync, win.debugLayer}))
         MEALKIT_FATAL("Renderer initialization failed.\n%s", renderer.initError());
     asset::ModelCache models;
     models.setRenderer(&renderer);
 
+    // 매치 데이터 (헤드리스·에디터 플레이와 같은 함수): 프로젝트 설정(출시본은 exe 옆, 개발 중에는 프로젝트 폴더의 mealkit.project),
+    // 씬, 튜닝, 콘텐츠 해시. 실행 파일 + 이 해시가 같아야 접속할 수 있다
+    MatchData data;
+    if (!loadMatchData(gameTypes(module), {match.scenePath, match.tuningPath}, models, data))
+        MEALKIT_FATAL("Cannot load the match data (see log)");
+    const ProjectFile& project = data.project;
+    if (spec.defaults && data.gameProject.data()) {
+        spec.defaults(match, data.gameProject.data()); // 헤드리스와 같은 기본값 함수 (포트·인원)
+    }
+    const scene::Scene& scene = data.scene;
+
     net::LockstepSession session;
-    // 실행 파일 + 씬 + 모델 파일 + 튜닝 + 프로젝트 설정(해시 대상 항목) + 시뮬레이션 표가 모두 같아야 접속할 수 있다
-    const reflect::TypeInfo* tuningType = module.tuningType ? module.tuningType() : nullptr;
-    reflect::Instance tuning = tuningType ? reflect::Instance(*tuningType) : reflect::Instance();
-    if (tuningType) loadTuning(*tuningType, tuning.data(), opt.tuningPath);
-    session.setContentHash(contentHash(scene, models, module.objectTypes ? module.objectTypes() : nullptr, tuningType,
-                                       tuning.data(), {&reflect::typeOf<ProjectSettings>(), &project.settings},
-                                       {gameProjectType, gameProject.data()}, module.tables ? module.tables() : nullptr));
-    session.setAcceptOtherBuilds(opt.anyBuild);
-    const u64 seed = opt.seed ? opt.seed : static_cast<u64>(std::time(nullptr));
-    switch (opt.mode) {
-    case Options::Mode::Offline: break; // 아래에서 게임이 로드아웃을 정한 뒤 연다
-    case Options::Mode::Host:
-        if (!session.host(opt.port, opt.maxPlayers, opt.inputDelay, opt.loopbackOnly))
-            MEALKIT_FATAL("Could not host on port %u", opt.port);
+    session.setContentHash(data.contentHash);
+    session.setAcceptOtherBuilds(match.anyBuild);
+    const u64 seed = match.seed ? match.seed : static_cast<u64>(std::time(nullptr));
+    switch (match.mode) {
+    case MatchOptions::Mode::Offline: break; // 아래에서 게임이 로드아웃을 정한 뒤 연다
+    case MatchOptions::Mode::Host:
+        if (!session.host(match.port, match.maxPlayers, match.inputDelay, match.loopbackOnly))
+            MEALKIT_FATAL("Could not host on port %u", match.port);
         break;
-    case Options::Mode::Join: {
+    case MatchOptions::Mode::Join: {
         net::Address address;
-        if (!net::startup() || !net::resolveAddress(opt.joinAddress.c_str(), opt.port, address))
-            MEALKIT_FATAL("Could not resolve '%s'", opt.joinAddress.c_str());
+        if (!net::startup() || !net::resolveAddress(match.joinAddress.c_str(), match.port, address))
+            MEALKIT_FATAL("Could not resolve '%s'", match.joinAddress.c_str());
         net::cleanup();
         if (!session.join(address)) MEALKIT_FATAL("Could not open a UDP socket");
         break;
     }
-    case Options::Mode::SteamHost:
-    case Options::Mode::SteamJoin: break; // 로비가 준비되면 아래 루프에서 세션을 연다
+    case MatchOptions::Mode::SteamHost:
+    case MatchOptions::Mode::SteamJoin: break; // 로비가 준비되면 아래 루프에서 세션을 연다
     }
 
     // 온라인 로비(Steam): 로비를 만들거나 들어간 뒤, 방장 주소로 락스텝 세션을 연다 (플랫폼 릴레이 경유)
-    const bool useSteam = opt.mode == Options::Mode::SteamHost || opt.mode == Options::Mode::SteamJoin;
+    const bool useSteam = match.mode == MatchOptions::Mode::SteamHost || match.mode == MatchOptions::Mode::SteamJoin;
     online::Service online;
     if (useSteam) {
         if (online::Service::backend() != online::Backend::Steam || !online.init())
             MEALKIT_FATAL(
                 "Steam is not available. Run the Steam client, and build with the Steamworks SDK (see " MEALKIT_DOCS_URL
                 "manual/multiplayer.html#steamworks).");
-        if (opt.mode == Options::Mode::SteamHost) online.createLobby(opt.maxPlayers);
-        else online.joinLobby(opt.steamLobby);
+        if (match.mode == MatchOptions::Mode::SteamHost) online.createLobby(match.maxPlayers);
+        else online.joinLobby(match.steamLobby);
     }
 
     GameInstance* game = module.create();
     PlayOptions gameOptions;
-    gameOptions.bot = opt.bot;
-    gameOptions.exitTick = opt.exitTick;
-    gameOptions.capture = !opt.capturePath.empty();
-    gameOptions.captureTick = opt.captureTick;
-    gameOptions.physicsThreads = opt.physicsThreads;
-    gameOptions.tuningPath = opt.tuningPath;
-    gameOptions.shadow = opt.shadow;
-    gameOptions.record = opt.rewindTest;
-    gameOptions.hashLogPath = opt.hashLogPath;
-    gameOptions.recordInputsPath = opt.recordInputsPath;
+    gameOptions.bot = win.bot;
+    gameOptions.exitTick = match.exitTick;
+    gameOptions.capture = !win.capturePath.empty();
+    gameOptions.captureTick = win.captureTick;
+    gameOptions.physicsThreads = match.physicsThreads;
+    gameOptions.tuningPath = match.tuningPath;
+    gameOptions.shadow = match.shadow;
+    gameOptions.record = win.rewindTest;
+    gameOptions.hashLogPath = match.hashLogPath;
+    gameOptions.recordInputsPath = match.recordInputsPath;
     const std::string userFolderPath = automated ? std::string() : userFolder(project.settings);
-    if (opt.mode == Options::Mode::Offline) {
+    if (match.mode == MatchOptions::Mode::Offline) {
         game->lobby(session, gameOptions, userFolderPath); // 매치 시작 데이터 (로드아웃)
-        session.startOffline(seed, opt.matchData);
+        session.startOffline(seed, match.matchData);
     }
 
     FrameLimiter limiter;
-    limiter.setTargetFps(opt.vsync ? 0.0 : opt.fpsCap);
+    limiter.setTargetFps(win.vsync ? 0.0 : win.fpsCap);
 
     // 소리: 기본 출력 장치 (없으면 소리 없이 돈다). 창이 포커스를 잃으면 음소거 (플레이어 설정에서 끌 수 있다)
     audio::Engine audio;
-    audio.init({project.settings.audioVoices, opt.mute});
+    audio.init({project.settings.audioVoices, win.mute});
     feedback::Player feedback(audio); // assets/feedback.table: 틱 이벤트 → 소리·흔들림·번쩍임·화면 정지
 
     // 화면 쪽 서비스: 입력 액션(assets/input.bindings + 플레이어가 바꾼 키), 문자열 표, 게임 UI, 플레이어 설정, 화면용 튜닝.
@@ -380,16 +225,16 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
         c.renderer = &renderer;
         c.audio = &audio;
         c.feedback = &feedback;
-        const bool display = !automated && !opt.windowGiven;
+        const bool display = !automated && !win.windowGiven;
         c.displayWindow = display ? &window : nullptr;
         c.limiter = &limiter;
-        c.language = opt.language;
+        c.language = win.language;
         c.projectLanguage = project.settings.language;
         c.bindingsUserFile = userFolder(project.settings) + "/" + input::kBindingsTable;
         c.settingsFile = automated ? std::string() : userFolder(project.settings) + "/" + settings::kSettingsFile;
         c.viewTuningType = module.viewTuningType ? module.viewTuningType() : nullptr; // 파일이 바뀌면 다시 읽는다
         front.init(c);
-        if (opt.openSettings) front.settings().open();
+        if (win.openSettings) front.settings().open();
     }
 
     GameContext ctx = front.context(window, renderer, models, session);
@@ -424,7 +269,7 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
             if (online.lobbyState() == online::LobbyState::Failed) MEALKIT_FATAL("Online lobby failed (see log)");
             if (session.state() == net::SessionState::Idle && online.lobbyState() == online::LobbyState::InLobby) {
                 if (online.isLobbyOwner()) {
-                    session.hostWith(online.createTransport(), opt.maxPlayers, opt.inputDelay);
+                    session.hostWith(online.createTransport(), match.maxPlayers, match.inputDelay);
                     online.inviteFriends();
                 } else {
                     session.joinWith(online.createTransport(), online.lobbyOwnerAddress());
@@ -441,8 +286,8 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
             game->lobby(session, gameOptions, ctx.userFolder); // 로비: 로드아웃을 정한다 (호스트가 시작할 때 확정)
 
         if (session.isHost() && session.state() == net::SessionState::Lobby) {
-            if (input.keyPressed(key::Enter) || (opt.autoStart && session.lobbyPlayerCount() >= opt.autoStart))
-                session.startMatch(seed, opt.matchData);
+            if (input.keyPressed(key::Enter) || (match.autoStart && session.lobbyPlayerCount() >= match.autoStart))
+                session.startMatch(seed, match.matchData);
         }
         if (session.state() == net::SessionState::Ended && automated && exitDeadline == 0.0) {
             MEALKIT_ERROR("Session ended before the exit tick: %s", session.endReason());
@@ -459,7 +304,7 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
         ctx.viewport = {0.0f, 0.0f, static_cast<f32>(window.width()), static_cast<f32>(window.height())};
         ctx.keyboardAllowed = ctx.mouseAllowed = window.focused();
 #if MEALKIT_DEBUG_UI
-        if (input.keyPressed(key::F1) || (opt.debugUi && !debugUiReady)) {
+        if (input.keyPressed(key::F1) || (win.debugUi && !debugUiReady)) {
             if (!debugUiReady) debugUiReady = debugUi.init(window, renderer, {});
             debugUiShown = debugUiReady && !debugUiShown;
         }
@@ -471,12 +316,12 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
 #endif
         front.update(now, dt, input, window.focused(), ctx);
         game->update(ctx, dt);
-        audio.setMuted(opt.mute || (front.settings().values().audio.muteUnfocused && !window.focused()));
+        audio.setMuted(win.mute || (front.settings().values().audio.muteUnfocused && !window.focused()));
         audio.update(dt);
         feedback.update(dt);
-        if (game->captureDue()) renderer.requestCapture(opt.capturePath.c_str());
+        if (game->captureDue()) renderer.requestCapture(win.capturePath.c_str());
         if (game->finished() && exitDeadline == 0.0) {
-            exitCode = reportFinish(*game, session, opt);
+            exitCode = reportFinish(*game, session, match, win);
             exitDeadline = now + 1.0; // 상대가 마지막 틱을 받을 시간을 준 뒤 종료
         }
 
@@ -514,7 +359,7 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
         // ---- 창 제목에 상태 표시 (4Hz) ----
         if (perf.update(dt, {&renderer, &session, &audio, game})) {
             // 플레이어에게 보이는 글자는 문자열 표(assets/strings), 성능 숫자는 개발용이라 영어 그대로
-            std::string status = lobbyStatus(session, online, useSteam, opt.maxPlayers, front.strings());
+            std::string status = lobbyStatus(session, online, useSteam, match.maxPlayers, front.strings());
             const bool running = status.empty();
             if (running) status = perf.line();
             window.setTitle((front.strings().get("game.title") + " | " + status).c_str());
