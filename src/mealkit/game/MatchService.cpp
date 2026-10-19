@@ -18,6 +18,7 @@ void MatchService::init(const MatchServiceConfig& config) {
     m_session.reset();
     m_session.setContentHash(config.contentHash);
     m_session.setAcceptOtherBuilds(config.acceptOtherBuilds);
+    m_session.setConditions(config.conditions);
     std::string name = config.playerName;
     if (name.empty() && config.online && config.online->available()) name = config.online->displayName();
     if (name.empty()) name = userName();

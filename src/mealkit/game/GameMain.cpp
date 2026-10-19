@@ -179,6 +179,7 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
         c.inputDelay = opt.inputDelay;
         c.loopbackOnly = opt.loopbackOnly;
         c.seed = opt.seed;
+        c.conditions = {opt.netLagMs, opt.netJitterMs, opt.netLossPercent};
         c.online = online.available() ? &online : nullptr;
         matches.init(c);
     }

@@ -39,6 +39,7 @@ struct MatchServiceConfig {
     bool announceRooms = true;   // 호스트가 LAN 방 알림을 보낸다 (에디터 플레이는 끈다)
     u64 seed = 0;                // 0이면 매치마다 현재 시각. 주면 첫 매치가 이 값, 다음 매치는 +1 (시험 재현)
     online::Service* online = nullptr; // Steam 로비 (없거나 init 실패면 IP·LAN만)
+    net::NetConditions conditions; // 네트워크 상태 흉내 (--net-lag/--net-jitter/--net-loss)
     std::string playerName; // 로비에 보이는 이름 (비어 있으면 온라인 계정 이름, 그것도 없으면 이 컴퓨터의 사용자 이름)
 };
 

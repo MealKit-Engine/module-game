@@ -33,7 +33,10 @@ void printGameUsage(const char* name, bool headless) {
                 headless ? " (default: --players)" : "", headless ? " (required unless replaying)" : "");
     if (headless)
         std::printf("  --replay-inputs <file> replay a recorded match and compare every tick hash (no network)\n");
-    std::printf("  --any-build            host: accept peers running a different build (compiler comparison tests)\n");
+    std::printf("  --any-build            host: accept peers running a different build (compiler comparison tests)\n"
+                "  --net-lag <ms>         add round-trip time to this process's connection (testing)\n"
+                "  --net-jitter <ms>      vary each packet's delay by up to this much (testing)\n"
+                "  --net-loss <percent>   drop this share of sent and received packets (testing)\n");
     if (headless) {
         std::printf("Window options (--bot, --vsync, --fps, --size, --debug, ...) are accepted and ignored.\n");
         return;
@@ -96,6 +99,9 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
         else if (a == "--record-inputs" && next(v)) o.recordInputsPath = v;
         else if (a == "--replay-inputs" && headless && next(v)) o.replayInputsPath = v;
         else if (a == "--any-build") o.anyBuild = true;
+        else if (a == "--net-lag" && next(v)) o.netLagMs = static_cast<f32>(std::atof(v));
+        else if (a == "--net-jitter" && next(v)) o.netJitterMs = static_cast<f32>(std::atof(v));
+        else if (a == "--net-loss" && next(v)) o.netLossPercent = static_cast<f32>(std::atof(v));
         // ---- 창
         else if (a == "--headless") continue; // 출시 exe의 main이 이미 나눴다
         else if (a == "--vsync" && next(v)) w.vsync = std::atoi(v) != 0, w.windowGiven = true;
