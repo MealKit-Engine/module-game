@@ -58,6 +58,7 @@ int printSystemInfo() {
         std::printf("GPU: none (%s)\n", error.c_str());
         return 2;
     }
+    std::printf("Graphics API: %s (Feature level, Shader Model and binding tier are Direct3D 12 only)\n", gpu.api.c_str());
     std::printf("GPU: %s (vendor 0x%04X, device 0x%04X)\n"
                 "Driver: %s\n"
                 "Memory: %llu MB dedicated, %llu MB shared, %s\n"
