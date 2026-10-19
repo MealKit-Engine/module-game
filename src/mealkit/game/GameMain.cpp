@@ -1,13 +1,13 @@
 // 출시 exe의 main (mealkit/game/GameMain.h). 게임의 app/main.cpp가 MEALKIT_GAME_MAIN으로 부른다.
 //
-//   <게임>.exe                         혼자 플레이
-//   <게임>.exe --host [port]           방 만들기 (로비에서 Enter로 시작)
+//   <게임>.exe                         메뉴가 있는 게임은 타이틀부터 (GameInstance::menus), 없으면 혼자 플레이
+//   <게임>.exe --host [port]           방 만들기 (로비부터. 메뉴가 없는 게임은 Enter로 시작)
 //   <게임>.exe --join 127.0.0.1[:port] 참가
 //   <게임>.exe --scene my.scene        다른 씬으로 플레이 (모든 플레이어가 같은 파일이어야 한다)
 //   <게임>.exe --headless ...          창 없이 시뮬레이션만 (게임의 app/Headless.cpp, <게임>_headless.exe와 같다)
 //
 // 시작 씬은 mealkit.project, 기본 포트·인원은 게임 헤드리스 클래스의 defaults()(보통 mealkit.project의 game.* 항목)에서 읽는다.
-// 엔진 키: V 수직동기, F12 스크린샷, F1 디버그 UI(개발 빌드), Esc 종료
+// 엔진 키: V 수직동기, F12 스크린샷, F1 디버그 UI(개발 빌드), Esc 종료(메뉴가 없는 게임만), I 친구 초대(온라인 로비)
 
 #include "mealkit/game/GameMain.h"
 
@@ -22,6 +22,7 @@
 #include "mealkit/game/Frontend.h"
 #include "mealkit/game/GameData.h"
 #include "mealkit/game/GameOptions.h"
+#include "mealkit/game/MatchService.h"
 #include "mealkit/game/ProjectSettings.h"
 #include "mealkit/net/Lockstep.h"
 #include "mealkit/net/Socket.h"
@@ -104,36 +105,39 @@ int reportFinish(GameInstance& game, const net::LockstepSession& session, const 
     return exitCode;
 }
 
-// 매치가 진행 중이 아닐 때 창 제목에 쓰는 상태 (게임 문자열 표의 title.* 키). 진행 중이면 빈 문자열
-std::string lobbyStatus(const net::LockstepSession& session, const online::Service& online, bool useSteam,
-                        u32 maxPlayers, const loc::Strings& strings) {
-    const net::SessionState state = session.state();
+// 매치가 진행 중이 아닐 때 창 제목에 쓰는 상태 (게임 문자열 표의 title.* 키). 진행 중이거나 메뉴면 빈 문자열
+std::string lobbyStatus(const MatchService& match, const loc::Strings& strings) {
+    const net::LockstepSession& session = match.session();
     const auto num = [](u32 v) { return std::to_string(v); };
-    if (useSteam && state == net::SessionState::Idle)
-        return strings.get(online.lobbyState() == online::LobbyState::Creating ? "title.steamCreating"
-                                                                               : "title.steamJoining");
-    if (state == net::SessionState::Lobby && session.isHost())
-        return strings.format(useSteam ? "title.lobbyHostSteam" : "title.lobbyHost",
-                              {{"count", num(session.lobbyPlayerCount())}, {"max", num(maxPlayers)}});
-    if (state == net::SessionState::Lobby || state == net::SessionState::Connecting)
-        return strings.format(state == net::SessionState::Connecting ? "title.connecting" : "title.waiting",
-                              {{"count", num(session.lobbyPlayerCount())}});
-    if (state == net::SessionState::Ended) return strings.format("title.ended", {{"reason", session.endReason()}});
-    return {};
+    switch (match.phase()) {
+    case MatchPhase::Opening:
+        return strings.get(match.config().online && match.config().online->lobbyState() == online::LobbyState::Creating
+                               ? "title.steamCreating"
+                               : "title.steamJoining");
+    case MatchPhase::Connecting: return strings.format("title.connecting", {{"count", num(session.lobbyPlayerCount())}});
+    case MatchPhase::Lobby:
+        if (session.isOffline()) return {};
+        if (session.isHost())
+            return strings.format(match.usesOnline() ? "title.lobbyHostSteam" : "title.lobbyHost",
+                                  {{"count", num(session.lobbyPlayerCount())}, {"max", num(session.maxPlayers())}});
+        return strings.format("title.waiting", {{"count", num(session.lobbyPlayerCount())}});
+    case MatchPhase::Ended: return strings.format("title.ended", {{"reason", match.error()}});
+    default: return {};
+    }
 }
 
 } // namespace
 
 int runGame(int argc, char** argv, const GameMainSpec& spec) {
     const GameModule& module = *spec.module;
-    MatchOptions match;
+    MatchOptions opt;
     WindowOptions win;
-    if (!parseGameArgs(argc, argv, match, &win)) {
+    if (!parseGameArgs(argc, argv, opt, &win)) {
         printGameUsage(module.name, false);
         return 1;
     }
     if (win.systemInfo) return printSystemInfo();
-    const bool automated = match.exitTick > 0;
+    const bool automated = opt.exitTick > 0 || win.frames > 0;
     if (automated) log::setDialogs(false);
 
     MEALKIT_INFO("CPU: %s", cpuName().c_str()); // 다른 PC 결정론 기록용
@@ -149,64 +153,69 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
     // 매치 데이터 (헤드리스·에디터 플레이와 같은 함수): 프로젝트 설정(출시본은 exe 옆, 개발 중에는 프로젝트 폴더의 mealkit.project),
     // 씬, 튜닝, 콘텐츠 해시. 실행 파일 + 이 해시가 같아야 접속할 수 있다
     MatchData data;
-    if (!loadMatchData(gameTypes(module), {match.scenePath, match.tuningPath}, models, data))
+    if (!loadMatchData(gameTypes(module), {opt.scenePath, opt.tuningPath}, models, data))
         MEALKIT_FATAL("Cannot load the match data (see log)");
     const ProjectFile& project = data.project;
-    if (spec.defaults && data.gameProject.data()) {
-        spec.defaults(match, data.gameProject.data()); // 헤드리스와 같은 기본값 함수 (포트·인원)
-    }
+    if (spec.defaults && data.gameProject.data()) spec.defaults(opt, data.gameProject.data()); // 헤드리스와 같은 기본값 (포트·인원)
     const scene::Scene& scene = data.scene;
 
-    net::LockstepSession session;
-    session.setContentHash(data.contentHash);
-    session.setAcceptOtherBuilds(match.anyBuild);
-    const u64 seed = match.seed ? match.seed : static_cast<u64>(std::time(nullptr));
-    switch (match.mode) {
-    case MatchOptions::Mode::Offline: break; // 아래에서 게임이 로드아웃을 정한 뒤 연다
-    case MatchOptions::Mode::Host:
-        if (!session.host(match.port, match.maxPlayers, match.inputDelay, match.loopbackOnly))
-            MEALKIT_FATAL("Could not host on port %u", match.port);
-        break;
-    case MatchOptions::Mode::Join: {
-        net::Address address;
-        if (!net::startup() || !net::resolveAddress(match.joinAddress.c_str(), match.port, address))
-            MEALKIT_FATAL("Could not resolve '%s'", match.joinAddress.c_str());
-        net::cleanup();
-        if (!session.join(address)) MEALKIT_FATAL("Could not open a UDP socket");
-        break;
-    }
-    case MatchOptions::Mode::SteamHost:
-    case MatchOptions::Mode::SteamJoin: break; // 로비가 준비되면 아래 루프에서 세션을 연다
-    }
-
-    // 온라인 로비(Steam): 로비를 만들거나 들어간 뒤, 방장 주소로 락스텝 세션을 연다 (플랫폼 릴레이 경유)
-    const bool useSteam = match.mode == MatchOptions::Mode::SteamHost || match.mode == MatchOptions::Mode::SteamJoin;
+    // 온라인 서비스(Steam): 빌드에 들어 있으면 시작할 때 로그인한다 (메뉴의 [Steam 방 만들기], 친구 초대 수락)
+    const bool steamAsked = opt.mode == MatchOptions::Mode::SteamHost || opt.mode == MatchOptions::Mode::SteamJoin;
     online::Service online;
-    if (useSteam) {
-        if (online::Service::backend() != online::Backend::Steam || !online.init())
-            MEALKIT_FATAL(
-                "Steam is not available. Run the Steam client, and build with the Steamworks SDK (see " MEALKIT_DOCS_URL
-                "manual/multiplayer.html#steamworks).");
-        if (match.mode == MatchOptions::Mode::SteamHost) online.createLobby(match.maxPlayers);
-        else online.joinLobby(match.steamLobby);
+    if (online::Service::backend() == online::Backend::Steam && !automated) online.init();
+    if (steamAsked && !online.available())
+        MEALKIT_FATAL("Steam is not available. Run the Steam client, and build with the Steamworks SDK (see " MEALKIT_DOCS_URL
+                      "manual/multiplayer.html#steamworks).");
+
+    // 세션은 MatchService 안에 있다. 게임의 화면 흐름(메뉴)도 같은 함수로 방을 열고 들어간다
+    MatchService matches;
+    {
+        MatchServiceConfig c;
+        c.contentHash = data.contentHash;
+        c.acceptOtherBuilds = opt.anyBuild;
+        c.gameName = project.settings.name.empty() ? module.name : project.settings.name;
+        c.defaultPort = opt.port;
+        c.defaultMaxPlayers = opt.maxPlayers;
+        c.inputDelay = opt.inputDelay;
+        c.loopbackOnly = opt.loopbackOnly;
+        c.seed = opt.seed;
+        c.online = online.available() ? &online : nullptr;
+        matches.init(c);
     }
+    net::LockstepSession& session = matches.session();
 
     GameInstance* game = module.create();
+    const bool menus = game->menus();
     PlayOptions gameOptions;
     gameOptions.bot = win.bot;
-    gameOptions.exitTick = match.exitTick;
-    gameOptions.capture = !win.capturePath.empty();
+    gameOptions.exitTick = opt.exitTick;
+    gameOptions.capture = !win.capturePath.empty() && (win.captureTick > 0 || win.frames == 0); // 틱이 없으면 --frames의 마지막 프레임
     gameOptions.captureTick = win.captureTick;
-    gameOptions.physicsThreads = match.physicsThreads;
-    gameOptions.tuningPath = match.tuningPath;
-    gameOptions.shadow = match.shadow;
+    gameOptions.physicsThreads = opt.physicsThreads;
+    gameOptions.tuningPath = opt.tuningPath;
+    gameOptions.shadow = opt.shadow;
     gameOptions.record = win.rewindTest;
-    gameOptions.hashLogPath = match.hashLogPath;
-    gameOptions.recordInputsPath = match.recordInputsPath;
+    gameOptions.hashLogPath = opt.hashLogPath;
+    gameOptions.recordInputsPath = opt.recordInputsPath;
     const std::string userFolderPath = automated ? std::string() : userFolder(project.settings);
-    if (match.mode == MatchOptions::Mode::Offline) {
-        game->lobby(session, gameOptions, userFolderPath); // 매치 시작 데이터 (로드아웃)
-        session.startOffline(seed, match.matchData);
+
+    // 명령줄로 정한 시작: 방 만들기·참가는 로비부터. 혼자 플레이는 메뉴가 있는 게임이면 메뉴부터(자동 실행·봇은 바로 매치)
+    switch (opt.mode) {
+    case MatchOptions::Mode::Offline:
+        if (!menus || opt.exitTick > 0 || win.bot) { // 자동 시험(--exit-tick)·봇은 메뉴 없이 바로 매치
+            matches.playOffline();
+            game->lobby(session, gameOptions, userFolderPath); // 매치 시작 데이터 (로드아웃)
+            matches.start(opt.matchData);
+        }
+        break;
+    case MatchOptions::Mode::Host:
+        if (!matches.host(opt.port, opt.maxPlayers)) MEALKIT_FATAL("%s", matches.error().c_str());
+        break;
+    case MatchOptions::Mode::Join:
+        if (!matches.join(opt.joinAddress)) MEALKIT_FATAL("%s", matches.error().c_str());
+        break;
+    case MatchOptions::Mode::SteamHost: matches.hostOnline(opt.maxPlayers); break;
+    case MatchOptions::Mode::SteamJoin: matches.joinOnline(opt.steamLobby); break;
     }
 
     FrameLimiter limiter;
@@ -237,8 +246,9 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
         if (win.openSettings) front.settings().open();
     }
 
-    GameContext ctx = front.context(window, renderer, models, session);
+    GameContext ctx = front.context(window, renderer, models, matches);
     ctx.userFolder = userFolderPath; // 세이브 (자동 실행은 저장하지 않는다)
+    ctx.scene = &scene;
 #if MEALKIT_DEBUG_UI
     // 디버그 UI (F1): 개발 빌드만 (출시 빌드 build.bat Export에는 ImGui가 없다). 처음 켤 때 만든다 (글꼴 읽기)
     debug::ImGuiLayer debugUi;
@@ -250,7 +260,9 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
     FrameStats perf; // 성능 숫자 (창 제목·F1·perf 로그, mealkit/game/FrameStats.h)
     u32 perfLogCounter = 0;
     int exitCode = 0;
-    f64 exitDeadline = 0.0; // --exit-tick 도달 후 종료 시각
+    f64 exitDeadline = 0.0;  // --exit-tick 도달 후 종료 시각
+    bool loadingShown = false; // 세션이 Running이 된 뒤 로딩 화면을 한 번 그렸다 (그다음 프레임에 start)
+    u32 frameCount = 0;        // --frames
 
     while (window.pumpMessages()) {
         const f64 now = nowSeconds();
@@ -259,46 +271,39 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
         Input& input = window.input();
         if (exitDeadline > 0.0 && now >= exitDeadline) break;
 
-        if (input.keyPressed(key::Escape) && !front.settings().isOpen()) break; // 설정 화면이 열려 있으면 Esc는 화면을 닫는다
-        if (input.keyPressed('V')) renderer.setVsync(!renderer.vsync());
+        // Esc: 메뉴가 있는 게임은 게임이 쓴다 (일시정지·뒤로). 없는 게임은 끝낸다 (설정 화면이 열려 있으면 화면을 닫는다)
+        if (!menus && input.keyPressed(key::Escape) && !front.settings().isOpen()) break;
+        if (input.keyPressed('V') && !front.ui().editingText()) renderer.setVsync(!renderer.vsync());
         if (input.keyPressed(key::F12)) renderer.requestCapture("screenshot.png");
         if (window.consumeResize()) renderer.resize(window.width(), window.height());
+        if (matches.usesOnline() && input.keyPressed('I') && !front.ui().editingText()) matches.inviteFriends();
 
-        if (useSteam) {
-            online.update();
-            if (online.lobbyState() == online::LobbyState::Failed) MEALKIT_FATAL("Online lobby failed (see log)");
-            if (session.state() == net::SessionState::Idle && online.lobbyState() == online::LobbyState::InLobby) {
-                if (online.isLobbyOwner()) {
-                    session.hostWith(online.createTransport(), match.maxPlayers, match.inputDelay);
-                    online.inviteFriends();
-                } else {
-                    session.joinWith(online.createTransport(), online.lobbyOwnerAddress());
-                }
-            }
-            if (const u64 invited = online.takeJoinRequest())
-                MEALKIT_INFO("Invite to lobby %llu received - restart the game from the invite to join",
-                             static_cast<unsigned long long>(invited));
-            if (input.keyPressed('I')) online.inviteFriends();
-        }
-
-        session.update(now);
-        if (!game->started() && session.state() != net::SessionState::Running && session.state() != net::SessionState::Ended)
+        matches.update(now);
+        const net::SessionState state = session.state();
+        if (!game->started() && state != net::SessionState::Running && state != net::SessionState::Ended)
             game->lobby(session, gameOptions, ctx.userFolder); // 로비: 로드아웃을 정한다 (호스트가 시작할 때 확정)
 
-        if (session.isHost() && session.state() == net::SessionState::Lobby) {
-            if (input.keyPressed(key::Enter) || (match.autoStart && session.lobbyPlayerCount() >= match.autoStart))
-                session.startMatch(seed, match.matchData);
+        if (session.isHost() && state == net::SessionState::Lobby && !session.isOffline()) {
+            const bool enter = !menus && input.keyPressed(key::Enter);
+            if (enter || (opt.autoStart && session.lobbyPlayerCount() >= opt.autoStart)) matches.start(opt.matchData);
         }
-        if (session.state() == net::SessionState::Ended && automated && exitDeadline == 0.0) {
+        if (state == net::SessionState::Ended && opt.exitTick > 0 && exitDeadline == 0.0) {
             MEALKIT_ERROR("Session ended before the exit tick: %s", session.endReason());
             exitCode = 3;
             break;
         }
 
+        // 매치 시작·끝: 시작은 로딩 화면을 한 번 그린 다음 프레임 (게임 화면 흐름이 Running이면 로딩 화면을 연다)
         if (!game->started() && session.state() == net::SessionState::Running) {
-            game->start(ctx, scene, gameOptions);
-            MEALKIT_INFO("World ready: %u player(s), you are player %u, %u moving bodies", session.playerCount(),
-                         session.localPlayer(), game->activeBodies());
+            if (loadingShown) {
+                game->start(ctx, scene, gameOptions);
+                MEALKIT_INFO("World ready: %u player(s), you are player %u, %u moving bodies", session.playerCount(),
+                             session.localPlayer(), game->activeBodies());
+            }
+            loadingShown = !loadingShown;
+        } else if (game->started() && session.state() != net::SessionState::Running) {
+            game->stop(ctx); // 로비로 돌아감, 나감, 끊김
+            loadingShown = false;
         }
 
         ctx.viewport = {0.0f, 0.0f, static_cast<f32>(window.width()), static_cast<f32>(window.height())};
@@ -315,13 +320,18 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
         }
 #endif
         front.update(now, dt, input, window.focused(), ctx);
+        for (const auto& [pressFrame, node] : win.uiPresses) // 화면 흐름 시험: 이 프레임에 위젯을 누른다 (게임이 이번 프레임에 액션을 받는다)
+            if (pressFrame == frameCount && !front.ui().pressAny(node)) MEALKIT_WARN("--ui-press: no widget '%s' at frame %u", node.c_str(), pressFrame);
         game->update(ctx, dt);
         audio.setMuted(win.mute || (front.settings().values().audio.muteUnfocused && !window.focused()));
         audio.update(dt);
         feedback.update(dt);
         if (game->captureDue()) renderer.requestCapture(win.capturePath.c_str());
+        ++frameCount;
+        const bool lastFrame = win.frames && frameCount >= win.frames;
+        if (lastFrame && !win.capturePath.empty() && win.captureTick == 0) renderer.requestCapture(win.capturePath.c_str());
         if (game->finished() && exitDeadline == 0.0) {
-            exitCode = reportFinish(*game, session, match, win);
+            exitCode = reportFinish(*game, session, opt, win);
             exitDeadline = now + 1.0; // 상대가 마지막 틱을 받을 시간을 준 뒤 종료
         }
 
@@ -355,11 +365,12 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
 
         limiter.wait();
         MEALKIT_FRAME_MARK();
+        if (lastFrame) break;
 
         // ---- 창 제목에 상태 표시 (4Hz) ----
         if (perf.update(dt, {&renderer, &session, &audio, game})) {
             // 플레이어에게 보이는 글자는 문자열 표(assets/strings), 성능 숫자는 개발용이라 영어 그대로
-            std::string status = lobbyStatus(session, online, useSteam, match.maxPlayers, front.strings());
+            std::string status = lobbyStatus(matches, front.strings());
             const bool running = status.empty();
             if (running) status = perf.line();
             window.setTitle((front.strings().get("game.title") + " | " + status).c_str());
@@ -370,8 +381,9 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
         }
     }
 
+    if (game->started()) game->stop(ctx);
     module.destroy(game);
-    session.shutdown();
+    matches.shutdown();
     audio.shutdown();
     online.shutdown();
 #if MEALKIT_DEBUG_UI

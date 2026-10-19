@@ -45,7 +45,9 @@ void printGameUsage(const char* name, bool headless) {
                 "  --debug                enable the D3D12 debug layer\n"
                 "  --bot                  drive the local player with scripted input\n"
                 "  --rewind-test          record inputs and snapshots, rewind and replay at the exit tick\n"
-                "  --capture <png> <tick> save a screenshot after the given tick\n"
+                "  --capture <png> [tick] save a screenshot after the given tick (no tick: the last of --frames)\n"
+                "  --frames <n>           draw n frames and exit (screens outside a match, e.g. the title)\n"
+                "  --ui-press <f:node,..> press the UI widget named node at frame f (screen flow tests)\n"
                 "  --system-info          print CPU/GPU capabilities and exit (exit code 2 if below minimum spec)\n"
                 "  --mute                 start with sound off (automated tests)\n"
                 "  --debug-ui             start with the debug UI shown (F1, development builds)\n"
@@ -105,10 +107,24 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
         } else if (a == "--debug") w.debugLayer = true;
         else if (a == "--bot") w.bot = true;
         else if (a == "--rewind-test") w.rewindTest = true;
-        else if (a == "--capture" && i + 2 < argc) {
+        else if (a == "--capture" && i + 1 < argc) { // <png> [tick]
             w.capturePath = argv[++i];
-            w.captureTick = u32Of(argv[++i]);
-        } else if (a == "--system-info") w.systemInfo = true;
+            if (i + 1 < argc && argv[i + 1][0] != '-') w.captureTick = u32Of(argv[++i]);
+        } else if (a == "--frames" && next(v)) w.frames = u32Of(v);
+        else if (a == "--ui-press" && next(v)) { // "프레임:노드,프레임:노드"
+            const std::string list = v;
+            size_t at = 0;
+            while (at < list.size()) {
+                size_t end = list.find(',', at);
+                if (end == std::string::npos) end = list.size();
+                const std::string item = list.substr(at, end - at);
+                const size_t colon = item.find(':');
+                if (colon != std::string::npos)
+                    w.uiPresses.emplace_back(u32Of(item.substr(0, colon).c_str()), item.substr(colon + 1));
+                at = end + 1;
+            }
+        }
+        else if (a == "--system-info") w.systemInfo = true;
         else if (a == "--mute") w.mute = true;
         else if (a == "--debug-ui") w.debugUi = true;
         else if (a == "--settings") w.openSettings = true;

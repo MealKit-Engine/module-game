@@ -68,6 +68,20 @@ public:
         if (!options.hashLogPath.empty()) m_hashLog.open(options.hashLogPath);
     }
 
+    // 매치를 끝낸다 (World를 버린다, 파일을 닫는다). 다음 start로 새 매치
+    void stop() {
+        m_world.reset();
+        m_shadow.reset();
+        m_started = m_finished = false;
+        m_paused = m_viewingPast = false;
+        m_snapshots.clear();
+        m_inputs.clear();
+        m_hashes.clear();
+        m_live = {};
+        m_recordWriter.close();
+        m_hashLog.close();
+    }
+
     bool started() const { return m_started; }
     bool finished() const { return m_finished; }
     u32 nextTick() const { return m_nextTick; }

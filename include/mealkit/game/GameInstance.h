@@ -30,8 +30,9 @@ namespace mealkit::game {
 // 11: 소리(GameContext::audio), FrameParams::cameraForward, 12: 연출 표(GameContext::feedback, EventType), MEALKIT_ENUM,
 // 13: 입력 액션(GameContext::actions), 14: 디버그 UI(GameInstance::debugUi, 에디터와 게임 DLL이 mealkit.dll의 ImGui 하나를 쓴다),
 // 15: 문자열 표(GameContext::strings), 16: 게임 화면 UI(GameContext::ui, GameModule::viewModels),
-// 17: 플레이어 설정(GameContext::settings), 18: GameContext::userFolder (세이브), 19: 매치 시작 데이터(GameInstance::lobby, MatchInfo::loadouts)
-inline constexpr u32 kApiVersion = 19;
+// 17: 플레이어 설정(GameContext::settings), 18: GameContext::userFolder (세이브), 19: 매치 시작 데이터(GameInstance::lobby, MatchInfo::loadouts),
+// 20: 화면 흐름(GameContext::match, GameInstance::menus·stop, 로비 이름·준비·채팅)
+inline constexpr u32 kApiVersion = 20;
 
 struct PlayOptions {
     bool bot = false;    // 스크립트 입력 (자동 테스트)
@@ -56,14 +57,20 @@ public:
     virtual void lobby(net::LockstepSession& session, const PlayOptions& options, const std::string& userFolder) {
         (void)session, (void)options, (void)userFolder;
     }
-    // 세션이 Running이 되면 한 번 호출한다.
+    // 세션이 Running이 되면 한 번 호출한다 (그 프레임은 로딩 화면을 그리게 한 프레임 뒤에).
     virtual void start(GameContext& ctx, const scene::Scene& scene, const PlayOptions& options) = 0;
     virtual bool started() const = 0;
+    // 매치가 끝나 세션이 Running이 아니게 되면(로비로 돌아감, 나감, 끊김) 한 번. 다음 매치에서 start가 다시 불린다
+    virtual void stop(GameContext& ctx) { (void)ctx; }
+    // 게임이 화면 흐름(타이틀·메뉴·로비·결과 화면, ctx.match)을 그린다. 그러면 엔진은 명령줄이 없을 때 메뉴(세션 없음)에서 시작하고
+    // Esc·Enter를 쓰지 않는다. false면 예전처럼 명령줄 그대로 바로 혼자 플레이하고, 호스트는 Enter로 시작, Esc로 끝낸다
+    virtual bool menus() const { return false; }
     // 매 프레임: 카메라 입력과 시뮬레이션 틱 실행.
     virtual void update(GameContext& ctx, f64 dt) = 0;
     // 장면을 그릴 데이터를 채운다 (ctx.viewport 영역, 로컬 플레이어는 ctx.session.localPlayer()).
     virtual void buildFrame(GameContext& ctx, f64 now, render::FrameParams& frame, render::DrawList& out) = 0;
 
+    // 아래 값은 매치 전(메뉴·로비·로딩 프레임)에도 불린다: 매치가 없으면 0이나 빈 값을 돌려준다
     virtual u32 nextTick() const = 0;
     virtual u64 stateHash() const = 0;
     virtual u32 activeBodies() const = 0;

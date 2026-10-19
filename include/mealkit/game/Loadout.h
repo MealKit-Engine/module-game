@@ -45,4 +45,16 @@ bool readLoadout(const MatchInfo& match, u32 player, T& out) {
     return true;
 }
 
+// 로비에서 다른 사람이 고른 값 (로비 화면에 보여 주기, net::LockstepSession::lobbyMembers). 매치는 readLoadout으로 읽는다
+template <class T>
+bool readLobbyLoadout(const net::LobbyMember& member, T& out) {
+    checkLoadoutType<T>();
+    if (member.loadout.size() != 4 + sizeof(T)) return false;
+    u32 type = 0;
+    std::memcpy(&type, member.loadout.data(), 4);
+    if (type != static_cast<u32>(fnv1a(reflect::typeOf<T>().name))) return false;
+    std::memcpy(&out, member.loadout.data() + 4, sizeof(T));
+    return true;
+}
+
 } // namespace mealkit::game

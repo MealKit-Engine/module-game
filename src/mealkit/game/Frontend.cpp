@@ -28,9 +28,8 @@ void Frontend::init(const FrontendConfig& config) {
     else m_viewTuning.close();
 }
 
-GameContext Frontend::context(Window& window, render::Renderer& renderer, asset::ModelCache& models,
-                              net::LockstepSession& session) {
-    return GameContext{window, renderer, models, session, *m_config.audio, *m_config.feedback,
+GameContext Frontend::context(Window& window, render::Renderer& renderer, asset::ModelCache& models, MatchService& match) {
+    return GameContext{window, renderer, models, match.session(), match, *m_config.audio, *m_config.feedback,
                        m_actions, m_strings, m_ui, m_settings};
 }
 

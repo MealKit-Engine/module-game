@@ -33,6 +33,12 @@ class ModelCache;
 namespace net {
 class LockstepSession;
 }
+namespace scene {
+struct Scene;
+}
+namespace game {
+class MatchService;
+}
 } // namespace mealkit
 
 // 게임의 화면 쪽(app/, view/)이 쓰는 엔진 서비스 묶음 (docs/CODING_MODEL.md "엔진 기능에 어떻게 접근하나").
@@ -45,6 +51,8 @@ struct GameContext {
     render::Renderer& renderer;
     asset::ModelCache& models;
     net::LockstepSession& session;
+    // 매치 열기·참가·나가기 (mealkit/game/MatchService.h): 화면 흐름의 메뉴가 부른다 (host, join, playOffline, start, returnToLobby, leave)
+    MatchService& match;
     audio::Engine& audio; // 소리 이벤트 재생 (mealkit/audio/Audio.h). 장치가 없으면 호출이 아무 일도 하지 않는다
     feedback::Player& feedback; // 이벤트 → 연출 표 (mealkit/feedback/Feedback.h): 틱 이벤트마다 trigger, 카메라 흔들림, 화면 정지
     // 입력 액션 (mealkit/input/Actions.h, assets/input.bindings): 키를 직접 보지 않고 actions.axis2("move")처럼 읽는다.
@@ -66,6 +74,8 @@ struct GameContext {
     reflect::View viewTuningData{};
     // 플레이어별 파일 폴더 (세이브 mealkit/game/Save.h, 설정, 바꾼 키). 비어 있으면 저장하지 않는다 (자동 실행, 참가 창)
     std::string userFolder;
+    // 매치 씬 (start에 넘기는 것과 같다). 매치 전 화면(메뉴 뒤 배경)에 쓴다. 다음 프레임에 바뀔 수 있으므로 보관하지 않는다
+    const scene::Scene* scene = nullptr;
 
     template <class T>
     const T& viewTuning() const {

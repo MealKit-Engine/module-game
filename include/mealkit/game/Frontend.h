@@ -3,6 +3,7 @@
 #include "mealkit/core/Types.h"
 #include "mealkit/game/GameContext.h"
 #include "mealkit/game/GameData.h"
+#include "mealkit/game/MatchService.h"
 #include "mealkit/input/Actions.h"
 #include "mealkit/loc/Strings.h"
 #include "mealkit/platform/Gamepad.h"
@@ -20,7 +21,7 @@ class Window;
 // 창 있는 게임의 화면 쪽 서비스 묶음 (docs/CODING_MODEL.md "창 있는 게임을 돌리는 프레임 루프").
 // 출시 exe(game::runGame)·에디터 플레이·참가 창이 하나씩 갖고 같은 순서로 돌린다:
 //   front.init(config);                                  // 바인딩·문자열·UI·설정 읽기 (다시 부르면 다시 읽는다)
-//   GameContext ctx = front.context(window, renderer, models, session);
+//   GameContext ctx = front.context(window, renderer, models, match);   // match: 세션을 가진 MatchService
 //   매 프레임: ctx.viewport·허용 플래그를 정하고 → front.update(now, dt, input, padAllowed, ctx) → game.update(ctx, dt)
 //             → game.buildFrame → front.afterBuildFrame(frame) → 3D 다음 front.renderUi(renderer)
 // 소리·연출은 주인(실행 파일, 에디터)이 만들고 갱신한다. 에디터는 [소리]·[연출] 미리보기와 같이 쓴다.
@@ -50,8 +51,7 @@ public:
 
     void init(const FrontendConfig& config);
     // 서비스를 가리키는 GameContext (창 크기·허용 플래그는 주인이 매 프레임 정한다)
-    GameContext context(Window& window, render::Renderer& renderer, asset::ModelCache& models,
-                        net::LockstepSession& session);
+    GameContext context(Window& window, render::Renderer& renderer, asset::ModelCache& models, MatchService& match);
 
     // 게임 update 전, 매 프레임 한 번. UI가 마우스·키보드를 가져가면 ctx의 허용 플래그를 끈다.
     // padAllowed: 게임패드 입력을 넘길지 (출시 exe는 창 포커스, 에디터는 게임 뷰가 키보드를 받을 때)

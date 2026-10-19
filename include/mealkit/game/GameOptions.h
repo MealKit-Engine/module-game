@@ -3,6 +3,8 @@
 #include "mealkit/core/Types.h"
 
 #include <string>
+#include <utility>
+#include <vector>
 
 // 게임 실행 파일의 명령줄 (출시 exe, --headless, <게임>_headless): 파서와 --help가 한 벌이다.
 //   매치 옵션(MatchOptions): 방 만들기·참가·인원·시드·자동 시험 출력. 헤드리스와 창 있는 exe가 같은 값을 쓰고,
@@ -40,7 +42,9 @@ struct WindowOptions {
     bool bot = false;        // 로컬 플레이어를 스크립트 입력으로 (헤드리스는 항상)
     bool rewindTest = false; // 끝날 때 기록을 되감아 다시 돌려 보고 결과를 출력
     std::string capturePath;
-    u32 captureTick = 0;
+    u32 captureTick = 0;      // 0이면 --frames의 마지막 프레임 (메뉴 화면 캡처)
+    u32 frames = 0;           // 이만큼 그리고 끝 (매치 밖 화면 시험, 에디터의 --frames와 같다)
+    std::vector<std::pair<u32, std::string>> uiPresses; // --ui-press: 이 프레임에 이 이름의 위젯을 누른다 (화면 흐름 시험)
     bool systemInfo = false;   // CPU·GPU 정보만 출력하고 끝
     bool mute = false;         // 소리 끄기 (자동 시험에서 여러 창을 띄울 때)
     bool debugUi = false;      // 디버그 UI(F1)를 켠 채로 시작 (개발 빌드)
