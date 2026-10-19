@@ -2,6 +2,7 @@
 
 #include "mealkit/core/Reflect.h"
 #include "mealkit/game/ProjectSettings.h"
+#include "mealkit/net/Lockstep.h"
 #include "mealkit/scene/Scene.h"
 
 #include <string>
@@ -66,6 +67,7 @@ struct MatchData {
     scene::Scene scene;            // 원본 (콘텐츠 해시, GameInstance::start). 시뮬레이션은 scene::flattened로 펼쳐 쓴다
     reflect::Instance tuning;      // types.tuningType 값
     u64 contentHash = 0;
+    u64 contentParts[static_cast<u32>(net::ContentPart::Count)] = {}; // 구성별 해시 (접속 거부 이유)
 };
 
 // 실패하면(주어진 씬 파일을 읽을 수 없음) 로그를 남기고 false. models는 해시에 쓸 모델 파일을 읽는다 (CPU 데이터만이어도 된다).

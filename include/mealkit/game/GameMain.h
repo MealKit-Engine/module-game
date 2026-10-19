@@ -1,5 +1,6 @@
 #pragma once
 
+#include "mealkit/game/BuildInfo.h"
 #include "mealkit/game/GameInstance.h"
 #include "mealkit/game/Headless.h"
 
@@ -16,6 +17,7 @@ struct GameMainSpec {
     const GameModule* module = nullptr;
     // (선택) 헤드리스 클래스의 defaults: 포트·인원 기본값 (gameProject는 GameModule::projectSettingsType의 값)
     void (*defaults)(MatchOptions& options, const void* gameProject) = nullptr;
+    BuildInfo build; // 이 게임 빌드 (게임 버전·커밋·시뮬레이션 버전, 게임의 main.cpp에서 만든다)
 };
 
 int runGame(int argc, char** argv, const GameMainSpec& spec);
@@ -24,6 +26,7 @@ template <class GameClass, class HeadlessClass>
 GameMainSpec gameMainSpec(const char* name) {
     GameMainSpec spec;
     spec.module = &gameModuleOf<GameClass>(name);
+    spec.build = MEALKIT_THIS_BUILD;
     if constexpr (requires { typename HeadlessClass::ProjectSettingsType; }) {
         using Project = typename HeadlessClass::ProjectSettingsType;
         if constexpr (requires { typename GameClass::ProjectSettingsType; })

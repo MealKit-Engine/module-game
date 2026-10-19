@@ -30,6 +30,9 @@ MEALKIT_STRUCT(ProjectSettings) {
     MEALKIT_FIELD_FLAGS(std::string, engine, {}, "Engine folder", reflect::kFieldView | reflect::kFieldReadOnly);
     MEALKIT_FIELD_FLAGS(std::string, engineVersion, {}, "Engine version", reflect::kFieldView | reflect::kFieldReadOnly);
     MEALKIT_VIEW_FIELD(std::string, scene, "scenes/arena.scene", "Start scene (under assets)");
+    // 게임 버전: 창 제목·타이틀·로비에 보이고, 시뮬레이션 버전에 들어간다(빌드할 때, 다른 버전과는 접속하지 않는다)
+    MEALKIT_VIEW_FIELD(std::string, version, "0.1.0", "Game version (shown to players, compared when joining)");
+    MEALKIT_VIEW_FIELD(bool, exportVersionFolder, false, "Put the version in the export folder name (export/<name>-<version>)");
     // 프로젝트 관리자가 보여 준다. 아이콘은 관리자에서 그림을 고르면 프로젝트 폴더에 PNG로 복사된다
     MEALKIT_VIEW_FIELD(std::string, icon, "icon.png", "Game icon (PNG, project folder)");
     MEALKIT_FIELD_FLAGS(std::string, created, {}, "Development started (YYYY-MM-DD)",

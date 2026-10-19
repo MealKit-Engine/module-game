@@ -4,6 +4,7 @@
 #include "mealkit/core/Clock.h"
 #include "mealkit/core/Log.h"
 #include "mealkit/core/Reflect.h"
+#include "mealkit/game/BuildInfo.h"
 #include "mealkit/game/GameData.h"
 #include "mealkit/game/GameOptions.h"
 #include "mealkit/game/InputRecord.h"
@@ -129,6 +130,11 @@ int runHeadless(int argc, char** argv) {
     session.setContentHash(data.contentHash);
     session.setAcceptOtherBuilds(options.anyBuild);
     session.setConditions({options.netLagMs, options.netJitterMs, options.netLossPercent});
+    const BuildInfo build = MEALKIT_THIS_BUILD; // 게임의 Headless.cpp에서 펼쳐진다 (빌드 정보 헤더)
+    session.setBuild(build.simVersion, build.gameVersion);
+    session.setContentParts(data.contentParts);
+    MEALKIT_INFO("Build: version %s, commit %s, simulation %016llx, %s", build.gameVersion, build.commit,
+                 static_cast<unsigned long long>(build.simVersion), net::determinismGroup());
     net::AutoDelay autoDelay = autoDelayOf(data.project.settings, 1000.0f / static_cast<f32>(reflect::tickRate()));
     autoDelay.enabled = autoDelay.enabled && !options.delayGiven; // --delay: 고정
     session.setAutoDelay(autoDelay);

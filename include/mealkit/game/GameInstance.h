@@ -2,6 +2,7 @@
 
 #include "mealkit/core/Reflect.h"
 #include "mealkit/core/Types.h"
+#include "mealkit/game/BuildInfo.h"
 #include "mealkit/game/GameContext.h"
 #include "mealkit/game/GameData.h"
 #include "mealkit/game/SimDebug.h"
@@ -31,8 +32,8 @@ namespace mealkit::game {
 // 13: 입력 액션(GameContext::actions), 14: 디버그 UI(GameInstance::debugUi, 에디터와 게임 DLL이 mealkit.dll의 ImGui 하나를 쓴다),
 // 15: 문자열 표(GameContext::strings), 16: 게임 화면 UI(GameContext::ui, GameModule::viewModels),
 // 17: 플레이어 설정(GameContext::settings), 18: GameContext::userFolder (세이브), 19: 매치 시작 데이터(GameInstance::lobby, MatchInfo::loadouts),
-// 20: 화면 흐름(GameContext::match, GameInstance::menus·stop, 로비 이름·준비·채팅)
-inline constexpr u32 kApiVersion = 20;
+// 20: 화면 흐름(GameContext::match, GameInstance::menus·stop, 로비 이름·준비·채팅), 21: GameModule::build (빌드 정보)
+inline constexpr u32 kApiVersion = 21;
 
 struct PlayOptions {
     bool bot = false;    // 스크립트 입력 (자동 테스트)
@@ -110,6 +111,8 @@ struct GameModule {
     const reflect::TypeInfo* (*eventType)() = nullptr;
     // 게임이 MEALKIT_VIEWMODEL로 선언한 뷰 모델 (에디터 [UI] 미리보기의 가짜 값, 바인딩 검사). DLL을 내리면 무효가 된다.
     const std::vector<const reflect::TypeInfo*>* (*viewModels)() = nullptr;
+    // 게임 빌드 정보 (게임 버전·커밋·시뮬레이션 버전, mealkit/game/BuildInfo.h)
+    BuildInfo build;
 };
 
 // 매치 데이터를 읽을 때 쓰는 게임 타입 (game::loadMatchData)
@@ -162,7 +165,8 @@ const GameModule& gameModuleOf(const char* name) {
         &gameViewTuningType<GameClass>,
         []() -> const reflect::TableList* { return &reflect::moduleTables(); },
         &gameEventType<GameClass>,
-        []() -> const std::vector<const reflect::TypeInfo*>* { return &reflect::moduleViewModels(); }};
+        []() -> const std::vector<const reflect::TypeInfo*>* { return &reflect::moduleViewModels(); },
+        MEALKIT_THIS_BUILD};
     return module;
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mealkit/core/Types.h"
+#include "mealkit/game/BuildInfo.h"
 #include "mealkit/net/Lockstep.h"
 #include "mealkit/net/Rooms.h"
 
@@ -41,6 +42,8 @@ struct MatchServiceConfig {
     online::Service* online = nullptr; // Steam 로비 (없거나 init 실패면 IP·LAN만)
     net::NetConditions conditions; // 네트워크 상태 흉내 (--net-lag/--net-jitter/--net-loss)
     net::AutoDelay autoDelay;      // 입력 지연 자동 조절 (꺼져 있으면 inputDelay 고정)
+    BuildInfo build;        // 이 빌드 (시뮬레이션 버전이 다른 피어는 받지 않는다, 게임 버전은 보이기만)
+    u64 contentParts[static_cast<u32>(net::ContentPart::Count)] = {}; // 콘텐츠 해시 구성 (거부 이유)
     std::string playerName; // 로비에 보이는 이름 (비어 있으면 온라인 계정 이름, 그것도 없으면 이 컴퓨터의 사용자 이름)
 };
 
@@ -50,7 +53,8 @@ struct RoomEntry {
     std::string hostName;
     u32 players = 0, maxPlayers = 0;
     bool compatible = true; // 같은 빌드·같은 게임 데이터 (아니면 접속이 거부된다)
-    bool sameBuild = true;
+    bool sameBuild = true;  // 같은 시뮬레이션 버전·결정론 그룹
+    std::string version;    // 방장의 게임 버전
 };
 
 class MatchService {

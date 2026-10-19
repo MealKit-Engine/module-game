@@ -20,6 +20,8 @@ void MatchService::init(const MatchServiceConfig& config) {
     m_session.setAcceptOtherBuilds(config.acceptOtherBuilds);
     m_session.setConditions(config.conditions);
     m_session.setAutoDelay(config.autoDelay);
+    m_session.setContentParts(config.contentParts);
+    m_session.setBuild(config.build.simVersion, config.build.gameVersion);
     std::string name = config.playerName;
     if (name.empty() && config.online && config.online->available()) name = config.online->displayName();
     if (name.empty()) name = userName();
@@ -176,7 +178,9 @@ void MatchService::update(f64 now) {
             room.game = m_config.gameName;
             const std::vector<net::LobbyMember>& members = m_session.lobbyMembers();
             room.hostName = members.empty() ? std::string() : members.front().name;
-            room.build = net::buildId();
+            room.simVersion = config().build.simVersion ? config().build.simVersion : net::buildId();
+            room.version = config().build.gameVersion;
+            room.group = net::determinismGroup();
             room.contentHash = m_config.contentHash;
             room.port = m_port;
             room.players = static_cast<u8>(m_session.lobbyPlayerCount());
@@ -195,7 +199,9 @@ void MatchService::update(f64 now) {
             e.hostName = r.hostName;
             e.players = r.players;
             e.maxPlayers = r.maxPlayers;
-            e.sameBuild = r.build == net::buildId();
+            e.version = r.version;
+            e.sameBuild = r.simVersion == (m_config.build.simVersion ? m_config.build.simVersion : net::buildId()) &&
+                          r.group == net::determinismGroup();
             e.compatible = e.sameBuild && r.contentHash == m_config.contentHash;
             m_rooms.push_back(std::move(e));
         }

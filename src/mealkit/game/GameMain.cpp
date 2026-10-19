@@ -141,6 +141,8 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
     if (automated) log::setDialogs(false);
 
     MEALKIT_INFO("CPU: %s", cpuName().c_str()); // 다른 PC 결정론 기록용
+    MEALKIT_INFO("Build: version %s, commit %s, simulation %016llx, %s", spec.build.gameVersion, spec.build.commit,
+                 static_cast<unsigned long long>(spec.build.simVersion), net::determinismGroup());
     Window window;
     if (!window.create({module.name, win.width, win.height})) return 1;
 
@@ -181,6 +183,8 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
         c.loopbackOnly = opt.loopbackOnly;
         c.seed = opt.seed;
         c.conditions = {opt.netLagMs, opt.netJitterMs, opt.netLossPercent};
+        c.build = spec.build;
+        std::copy(std::begin(data.contentParts), std::end(data.contentParts), std::begin(c.contentParts));
         c.autoDelay = autoDelayOf(project.settings, 1000.0f / static_cast<f32>(reflect::tickRate()));
         c.autoDelay.enabled = c.autoDelay.enabled && !opt.delayGiven; // --delay: 고정
         c.online = online.available() ? &online : nullptr;
@@ -377,7 +381,8 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
             std::string status = lobbyStatus(matches, front.strings());
             const bool running = status.empty();
             if (running) status = perf.line();
-            window.setTitle((front.strings().get("game.title") + " | " + status).c_str());
+            const std::string version = spec.build.gameVersion[0] ? std::string(" v") + spec.build.gameVersion : std::string();
+            window.setTitle((front.strings().get("game.title") + version + " | " + status).c_str());
 #if MEALKIT_DEBUG_UI
             perfText = running ? perf.lines() : status;
 #endif
