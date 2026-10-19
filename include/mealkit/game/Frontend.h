@@ -27,6 +27,16 @@ class Window;
 // 소리·연출은 주인(실행 파일, 에디터)이 만들고 갱신한다. 에디터는 [소리]·[연출] 미리보기와 같이 쓴다.
 namespace mealkit::game {
 
+// 표준 자막 화면 (assets/ui/subtitles.ui, 있으면): 자막이 있는 소리가 나면 화면 아래에 (플레이어 설정 gameplay.subtitles)
+MEALKIT_STRUCT(SubtitleLineVm) {
+    MEALKIT_FIELD(std::string, text, {}, "Subtitle text");
+};
+MEALKIT_VIEWMODEL(SubtitlesVm) {
+    MEALKIT_LIST(SubtitleLineVm, lines, 4, "Subtitle lines");
+};
+inline constexpr const char* kSubtitleScreen = "ui/subtitles.ui"; // assets 기준
+inline constexpr i32 kSubtitleLayer = 5;                         // HUD 위, 메뉴 아래
+
 struct FrontendConfig {
     render::Renderer* renderer = nullptr; // 게임 UI가 그릴 곳
     audio::Engine* audio = nullptr;
@@ -74,6 +84,9 @@ private:
     ui::System m_ui;
     settings::Service m_settings;
     LiveTuning m_viewTuning;
+    ui::ScreenId m_subtitleScreen = ui::kNoScreen;
+    SubtitlesVm m_subtitleVm;
+    bool m_hasSubtitleScreen = false;
 };
 
 } // namespace mealkit::game
