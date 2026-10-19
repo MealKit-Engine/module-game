@@ -58,6 +58,7 @@ public:
         m_finished = false;
         m_captureDone = m_captureDue = false;
         m_nextTick = 0;
+        m_pending.clear();
         m_accumulator = 0.0;
         m_paused = m_viewingPast = false;
         m_stepRequests = 0;
@@ -92,6 +93,14 @@ public:
     f32 alpha() const {
         if (!m_started || m_paused) return 1.0f;
         return std::clamp(static_cast<f32>(m_accumulator / m_tickDt), 0.0f, 1.0f);
+    }
+
+    // 보냈지만 아직 실행되지 않은 내 입력 (목표 틱 순): f(목표 틱, const net::PlayerInput&).
+    // 화면에서만 내 캐릭터를 미리 움직여 그릴 때 쓴다 (입력 지연을 가린다, 시뮬레이션은 그대로)
+    template <class F>
+    void forEachPendingInput(F&& f) const {
+        for (const PendingInput& p : m_pending)
+            if (p.tick >= m_nextTick) f(p.tick, p.input);
     }
 
     bool captureDue() {
@@ -233,7 +242,11 @@ private:
         if (m_options.record) record(inputs, hash);
         onTick(*m_world); // 틱 이벤트는 다음 step()에서 지워지므로 틱마다 바로 화면 쪽으로 옮긴다
 
-        session.submitLocalInput(m_nextTick + session.inputDelay(), sample(m_nextTick));
+        const net::PlayerInput local = sample(m_nextTick);
+        const u32 target = m_nextTick + session.inputDelay();
+        session.submitLocalInput(target, local);
+        while (!m_pending.empty() && m_pending.front().tick <= m_nextTick) m_pending.pop_front(); // 실행한 틱
+        if (m_pending.empty() || m_pending.back().tick < target) m_pending.push_back({target, local});
         if (m_options.capture && !m_captureDone && m_nextTick >= m_options.captureTick)
             m_captureDue = m_captureDone = true;
         const bool last = m_options.exitTick && m_nextTick >= m_options.exitTick;
@@ -324,6 +337,12 @@ private:
 
     InputRecordWriter m_recordWriter;
     HashLog m_hashLog;
+
+    struct PendingInput {
+        u32 tick = 0;
+        net::PlayerInput input;
+    };
+    std::deque<PendingInput> m_pending; // 보냈지만 아직 실행하지 않은 내 입력
 };
 
 } // namespace mealkit::game
