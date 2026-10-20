@@ -45,6 +45,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <string>
+#include <utility>
 
 namespace mealkit::game {
 namespace {
@@ -130,14 +131,18 @@ std::string lobbyStatus(const MatchService& match, const loc::Strings& strings) 
 } // namespace
 
 int runGame(int argc, char** argv, const GameMainSpec& spec) {
-    const GameModule& module = *spec.module;
     MatchOptions opt;
     WindowOptions win;
     if (!parseGameArgs(argc, argv, opt, &win)) {
-        printGameUsage(module.name, false);
+        printGameUsage(spec.module->name, false);
         return 1;
     }
     if (win.systemInfo) return printSystemInfo();
+    return runGame(std::move(opt), win, spec);
+}
+
+int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec, const GameRunOptions& run) {
+    const GameModule& module = *spec.module;
     const bool automated = opt.exitTick > 0 || win.frames > 0;
     if (automated) log::setDialogs(false);
 
@@ -145,7 +150,8 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
     MEALKIT_INFO("Build: version %s, commit %s, simulation %016llx, %s", spec.build.gameVersion, spec.build.commit,
                  static_cast<unsigned long long>(spec.build.simVersion), net::determinismGroup());
     Window window;
-    if (!window.create({module.name, win.width, win.height})) return 1;
+    if (!window.create({run.title.empty() ? module.name : run.title.c_str(), win.width, win.height, run.captionColor}))
+        return 1;
 
     render::Renderer renderer;
     if (!renderer.init({window.nativeHandle(), window.width(), window.height(), win.vsync, win.debugLayer}))
@@ -156,7 +162,11 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
     // 매치 데이터 (헤드리스·에디터 플레이와 같은 함수): 프로젝트 설정(출시본은 exe 옆, 개발 중에는 프로젝트 폴더의 mealkit.project),
     // 씬, 튜닝, 콘텐츠 해시. 실행 파일 + 이 해시가 같아야 접속할 수 있다
     MatchData data;
-    if (!loadMatchData(gameTypes(module), {opt.scenePath, opt.tuningPath}, models, data))
+    MatchDataOptions dataOptions;
+    dataOptions.scenePath = opt.scenePath;
+    dataOptions.tuningPath = opt.tuningPath;
+    dataOptions.project = run.project;
+    if (!loadMatchData(gameTypes(module), dataOptions, models, data))
         MEALKIT_FATAL("Cannot load the match data (see log)");
     const ProjectFile& project = data.project;
     if (spec.defaults && data.gameProject.data()) spec.defaults(opt, data.gameProject.data()); // 헤드리스와 같은 기본값 (포트·인원)
@@ -166,7 +176,7 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
     // 온라인 서비스(Steam): 빌드에 들어 있으면 시작할 때 로그인한다 (메뉴의 [Steam 방 만들기], 친구 초대 수락)
     const bool steamAsked = opt.mode == MatchOptions::Mode::SteamHost || opt.mode == MatchOptions::Mode::SteamJoin;
     online::Service online;
-    if (online::Service::backend() == online::Backend::Steam && !automated) online.init();
+    if (online::Service::backend() == online::Backend::Steam && !automated && run.onlineService) online.init();
     if (steamAsked && !online.available())
         MEALKIT_FATAL("Steam is not available. Run the Steam client, and build with the Steamworks SDK (see " MEALKIT_DOCS_URL
                       "manual/multiplayer.html#steamworks).");
@@ -206,7 +216,9 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
     gameOptions.record = win.rewindTest;
     gameOptions.hashLogPath = opt.hashLogPath;
     gameOptions.recordInputsPath = opt.recordInputsPath;
-    const std::string userFolderPath = automated ? std::string() : userFolder(project.settings);
+    // 사용자 폴더(세이브·설정·바꾼 키): 자동 실행(--exit-tick)과 참가 창은 쓰지 않는다
+    const bool playerFiles = !automated && run.playerFiles;
+    const std::string userFolderPath = playerFiles ? userFolder(project.settings) : std::string();
 
     // 명령줄로 정한 시작: 방 만들기·참가는 로비부터. 혼자 플레이는 메뉴가 있는 게임이면 메뉴부터(자동 실행·봇은 바로 매치)
     switch (opt.mode) {
@@ -248,9 +260,10 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
         c.limiter = &limiter;
         c.language = win.language;
         c.projectLanguage = project.settings.language;
-        c.bindingsUserFile = userFolder(project.settings) + "/" + input::kBindingsTable;
-        c.settingsFile = automated ? std::string() : userFolder(project.settings) + "/" + settings::kSettingsFile;
+        c.bindingsUserFile = run.playerFiles ? userFolder(project.settings) + "/" + input::kBindingsTable : std::string();
+        c.settingsFile = playerFiles ? userFolderPath + "/" + settings::kSettingsFile : std::string();
         c.viewTuningType = module.viewTuningType ? module.viewTuningType() : nullptr; // 파일이 바뀌면 다시 읽는다
+        c.viewTuningPath = run.viewTuningPath;
         front.init(c);
         if (win.openSettings) front.settings().open();
     }
@@ -300,6 +313,14 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
             MEALKIT_ERROR("Session ended before the exit tick: %s", session.endReason());
             exitCode = 3;
             break;
+        }
+        if (run.exitWhenSessionEnds && exitDeadline == 0.0) {
+            if (state == net::SessionState::Ended) {
+                MEALKIT_INFO("Session ended: %s", session.endReason());
+                exitCode = session.desynced() ? 2 : 0;
+                break;
+            }
+            if (matches.phase() == MatchPhase::Menu) break; // 게임이 [나가기]를 눌렀다
         }
 
         // 매치 시작·끝: 시작은 로딩 화면을 한 번 그린 다음 프레임 (게임 화면 흐름이 Running이면 로딩 화면을 연다)
@@ -383,7 +404,8 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
             const bool running = status.empty();
             if (running) status = perf.line();
             const std::string version = spec.build.gameVersion[0] ? std::string(" v") + spec.build.gameVersion : std::string();
-            window.setTitle((front.strings().get("game.title") + version + " | " + status).c_str());
+            const std::string title = run.title.empty() ? front.strings().get("game.title") + version : run.title;
+            window.setTitle((title + " | " + status).c_str());
 #if MEALKIT_DEBUG_UI
             perfText = running ? perf.lines() : status;
 #endif

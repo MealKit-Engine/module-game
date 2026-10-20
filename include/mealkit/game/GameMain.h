@@ -3,6 +3,7 @@
 #include "mealkit/game/BuildInfo.h"
 #include "mealkit/game/GameInstance.h"
 #include "mealkit/game/Headless.h"
+#include "mealkit/platform/Window.h"
 
 #include <string_view>
 #include <type_traits>
@@ -20,7 +21,22 @@ struct GameMainSpec {
     BuildInfo build; // 이 게임 빌드 (게임 버전·커밋·시뮬레이션 버전, 게임의 main.cpp에서 만든다)
 };
 
+// 출시 exe가 아닌 곳이 같은 프레임 루프를 돌릴 때 바꾸는 것 (에디터 여러 명 플레이의 참가 창, editor::runPlayer).
+// 기본값은 출시 exe 그대로다.
+struct GameRunOptions {
+    const ProjectFile* project = nullptr; // 이미 읽은 프로젝트 설정. nullptr이면 loadMatchData가 찾는다
+    std::string title;                    // 창 제목 앞부분. 비어 있으면 문자열 키 game.title + 게임 버전
+    u32 captionColor = kDefaultCaptionColor;
+    std::string viewTuningPath;       // 화면용 튜닝 파일. 비어 있으면 assets/view.tuning (바뀌면 다시 읽는다)
+    bool playerFiles = true;          // false: 사용자 폴더의 설정·바꾼 키·세이브를 읽고 쓰지 않는다 (같은 PC의 여러 창)
+    bool onlineService = true;        // false: 온라인 서비스(Steam)에 로그인하지 않는다
+    bool exitWhenSessionEnds = false; // 세션이 끝나거나 게임이 매치를 나가면(메뉴) 종료한다
+};
+
+// 명령줄을 읽어 아래 runGame을 부른다 (--help, --system-info)
 int runGame(int argc, char** argv, const GameMainSpec& spec);
+// 창·렌더러·세션·Frontend·프레임 루프. 종료 코드 (0 정상, 2 디싱크, 3 시험 중 세션 끝, 4 되감기 실패, 5 그림자 디싱크)
+int runGame(MatchOptions match, const WindowOptions& window, const GameMainSpec& spec, const GameRunOptions& run = {});
 
 template <class GameClass, class HeadlessClass>
 GameMainSpec gameMainSpec(const char* name) {
