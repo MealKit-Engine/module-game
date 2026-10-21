@@ -53,6 +53,8 @@ struct WindowOptions {
     bool debugUi = false;      // 디버그 UI(F1)를 켠 채로 시작 (개발 빌드)
     bool openSettings = false; // 설정 화면을 연 채로 시작
     std::string language;      // 게임 글자 언어 (비어 있으면 mealkit.project의 language)
+    bool gpuCapture = false;   // --gpu-capture: RenderDoc·PIX를 불러오고 F11로 다음 프레임 캡처 (개발 빌드)
+    u32 gpuCaptureAt = 0;      // --gpu-capture-at <프레임>: 그 프레임을 캡처 (자동 시험, RenderDoc 창은 열지 않는다)
     f64 benchmarkSeconds = 0.0; // --benchmark [초]: 0이 아니면 벤치마크 모드 (mealkit/game/Benchmark.h)
     std::string benchmarkPath = "benchmark.txt";
 };

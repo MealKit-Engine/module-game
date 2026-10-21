@@ -47,6 +47,7 @@ void printGameUsage(const char* name, bool headless) {
                 "  --fps <n>              frame cap when vsync is off\n"
                 "  --size <w> <h>         window size\n"
                 "  --debug                enable the D3D12 debug layer\n"
+                "  --gpu-capture          load RenderDoc or PIX if installed; F11 captures the next frame (development builds)\n"
                 "  --bot                  drive the local player with scripted input\n"
                 "  --rewind-test          record inputs and snapshots, rewind and replay at the exit tick\n"
                 "  --capture <png> [tick] save a screenshot after the given tick (no tick: the last of --frames)\n"
@@ -138,6 +139,8 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
         else if (a == "--debug-ui") w.debugUi = true;
         else if (a == "--settings") w.openSettings = true;
         else if (a == "--lang" && next(v)) w.language = v;
+        else if (a == "--gpu-capture") w.gpuCapture = true;
+        else if (a == "--gpu-capture-at" && next(v)) w.gpuCapture = true, w.gpuCaptureAt = u32Of(v);
         else if (a == "--benchmark") { // [초]
             w.benchmarkSeconds = 30.0;
             if (i + 1 < argc && argv[i + 1][0] != '-') w.benchmarkSeconds = std::max(1.0, std::atof(argv[++i]));

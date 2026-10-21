@@ -32,6 +32,7 @@
 #include "mealkit/platform/System.h"
 #include "mealkit/platform/Window.h"
 #include "mealkit/render/DrawList.h"
+#include "mealkit/rhi/GpuCapture.h"
 #include "mealkit/render/Renderer.h"
 #include "mealkit/scene/Scene.h"
 
@@ -202,7 +203,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         return 1;
 
     render::Renderer renderer;
-    if (!renderer.init({window.nativeHandle(), window.width(), window.height(), win.vsync, win.debugLayer}))
+    if (!renderer.init({window.nativeHandle(), window.width(), window.height(), win.vsync, win.debugLayer, win.gpuCapture}))
         MEALKIT_FATAL("Renderer initialization failed.\n%s", renderer.initError());
     asset::ModelCache models;
     models.setRenderer(&renderer);
@@ -346,6 +347,8 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         if (!menus && input.keyPressed(key::Escape) && !front.settings().isOpen()) break;
         if (input.keyPressed('V') && !front.ui().editingText()) renderer.setVsync(!renderer.vsync());
         if (input.keyPressed(key::F12)) renderer.requestCapture("screenshot.png");
+        if (input.keyPressed(key::F11)) rhi::captureNextGpuFrame(); // --gpu-capture (도구가 없으면 아무것도 안 한다)
+        if (win.gpuCaptureAt && frameCount == win.gpuCaptureAt) rhi::captureNextGpuFrame(false);
         if (window.consumeResize()) renderer.resize(window.width(), window.height());
         if (matches.usesOnline() && input.keyPressed('I') && !front.ui().editingText()) matches.inviteFriends();
 
