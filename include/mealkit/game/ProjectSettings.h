@@ -1,5 +1,6 @@
 #pragma once
 
+#include "mealkit/asset/Budget.h"
 #include "mealkit/core/Reflect.h"
 #include "mealkit/net/Lockstep.h"
 
@@ -54,6 +55,20 @@ MEALKIT_STRUCT(ProjectSettings) {
     MEALKIT_VIEW_FIELD(f32, gpuBudgetVfxMs, 1.0f, "GPU budget: effects and transparency (ms)");
     MEALKIT_VIEW_FIELD(f32, gpuBudgetUiMs, 0.5f, "GPU budget: UI (ms)");
     MEALKIT_VIEW_FIELD(f32, gpuBudgetSpareMs, 1.0f, "GPU budget: spare (ms)");
+    // 에셋 예산 (asset/Budget.h): 모델 종류는 assets/models/ 아래 폴더(characters, props, environment). 넘으면 불러올 때 경고하고
+    // 에디터 인스펙터·Blender 애드온이 같은 값으로 보여 준다. 기본값은 최소 사양 내장 그래픽 기준 (벤치마크로 고친다)
+    MEALKIT_VIEW_FIELD(u32, budgetCharactersTriangles, asset::kDefaultBudgets[0].triangles, "Budget, characters: triangles");
+    MEALKIT_VIEW_FIELD(u32, budgetCharactersTextureSize, asset::kDefaultBudgets[0].textureSize, "Budget, characters: texture size (px)");
+    MEALKIT_VIEW_FIELD(u32, budgetCharactersBones, asset::kDefaultBudgets[0].bones, "Budget, characters: bones");
+    MEALKIT_VIEW_FIELD(u32, budgetCharactersMaterials, asset::kDefaultBudgets[0].materials, "Budget, characters: materials");
+    MEALKIT_VIEW_FIELD(u32, budgetPropsTriangles, asset::kDefaultBudgets[1].triangles, "Budget, props: triangles");
+    MEALKIT_VIEW_FIELD(u32, budgetPropsTextureSize, asset::kDefaultBudgets[1].textureSize, "Budget, props: texture size (px)");
+    MEALKIT_VIEW_FIELD(u32, budgetPropsBones, asset::kDefaultBudgets[1].bones, "Budget, props: bones");
+    MEALKIT_VIEW_FIELD(u32, budgetPropsMaterials, asset::kDefaultBudgets[1].materials, "Budget, props: materials");
+    MEALKIT_VIEW_FIELD(u32, budgetEnvironmentTriangles, asset::kDefaultBudgets[2].triangles, "Budget, environment: triangles");
+    MEALKIT_VIEW_FIELD(u32, budgetEnvironmentTextureSize, asset::kDefaultBudgets[2].textureSize, "Budget, environment: texture size (px)");
+    MEALKIT_VIEW_FIELD(u32, budgetEnvironmentBones, asset::kDefaultBudgets[2].bones, "Budget, environment: bones");
+    MEALKIT_VIEW_FIELD(u32, budgetEnvironmentMaterials, asset::kDefaultBudgets[2].materials, "Budget, environment: materials");
 };
 
 struct ProjectFile {
@@ -85,6 +100,14 @@ inline u32 msToTicks(u32 ms) { return std::max(1u, static_cast<u32>(static_cast<
 
 // 프로젝트 설정의 입력 지연 범위를 틱으로 (tickMs: 한 틱 ms)
 net::AutoDelay autoDelayOf(const ProjectSettings& settings, f32 tickMs);
+
+// 종류별 모델 예산 (ModelCache::setBudgets에 넘긴다)
+inline void modelBudgets(const ProjectSettings& s, asset::ModelBudget (&out)[asset::kModelKindCount]) {
+    out[0] = {s.budgetCharactersTriangles, s.budgetCharactersTextureSize, s.budgetCharactersBones, s.budgetCharactersMaterials};
+    out[1] = {s.budgetPropsTriangles, s.budgetPropsTextureSize, s.budgetPropsBones, s.budgetPropsMaterials};
+    out[2] = {s.budgetEnvironmentTriangles, s.budgetEnvironmentTextureSize, s.budgetEnvironmentBones,
+              s.budgetEnvironmentMaterials};
+}
 
 // 시작 씬의 findAsset 경로 ("assets/scenes/arena.scene")
 inline std::string startSceneAsset(const ProjectSettings& settings) { return "assets/" + settings.scene; }
