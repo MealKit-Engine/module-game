@@ -53,6 +53,8 @@ struct WindowOptions {
     bool debugUi = false;      // 디버그 UI(F1)를 켠 채로 시작 (개발 빌드)
     bool openSettings = false; // 설정 화면을 연 채로 시작
     std::string language;      // 게임 글자 언어 (비어 있으면 mealkit.project의 language)
+    f64 benchmarkSeconds = 0.0; // --benchmark [초]: 0이 아니면 벤치마크 모드 (mealkit/game/Benchmark.h)
+    std::string benchmarkPath = "benchmark.txt";
 };
 
 // window가 nullptr이면 헤드리스: 창 옵션은 받고 무시하고, Steam은 받지 않는다. 모르는 옵션·--help면 false.

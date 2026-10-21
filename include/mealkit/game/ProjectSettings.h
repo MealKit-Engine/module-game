@@ -46,6 +46,14 @@ MEALKIT_STRUCT(ProjectSettings) {
     MEALKIT_VIEW_FIELD(bool, inputDelayAuto, true, "Choose the input delay from the players' ping");
     MEALKIT_VIEW_FIELD(u32, inputDelayMinMs, 60, "Shortest input delay (ms)");
     MEALKIT_VIEW_FIELD(u32, inputDelayMaxMs, 270, "Longest input delay (ms, slower players are warned in the lobby)");
+    // GPU 예산 (최소 사양 Intel 11세대 내장 그래픽 1280x720 60 fps 기준, 합이 프레임 GPU 예산). 벤치마크 보고서가 패스별 GPU 시간과
+    // 비교하고 넘으면 OVER로 표시한다 (docs/ROADMAP.md "벤치마크 모드"). 최소 사양 실측으로 고친다
+    MEALKIT_VIEW_FIELD(f32, gpuBudgetOpaqueMs, 3.0f, "GPU budget: opaque objects (ms)");
+    MEALKIT_VIEW_FIELD(f32, gpuBudgetShadowMs, 1.5f, "GPU budget: shadows (ms)");
+    MEALKIT_VIEW_FIELD(f32, gpuBudgetPostMs, 1.0f, "GPU budget: post processing (ms)");
+    MEALKIT_VIEW_FIELD(f32, gpuBudgetVfxMs, 1.0f, "GPU budget: effects and transparency (ms)");
+    MEALKIT_VIEW_FIELD(f32, gpuBudgetUiMs, 0.5f, "GPU budget: UI (ms)");
+    MEALKIT_VIEW_FIELD(f32, gpuBudgetSpareMs, 1.0f, "GPU budget: spare (ms)");
 };
 
 struct ProjectFile {

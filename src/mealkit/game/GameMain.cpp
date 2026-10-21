@@ -18,6 +18,7 @@
 #include "mealkit/core/Profile.h"
 #include "mealkit/core/Version.h"
 #include "mealkit/feedback/Feedback.h"
+#include "mealkit/game/Benchmark.h"
 #include "mealkit/game/FrameStats.h"
 #include "mealkit/game/Frontend.h"
 #include "mealkit/game/GameData.h"
@@ -43,6 +44,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <iterator>
 #include <ctime>
 #include <string>
 #include <utility>
@@ -77,6 +79,41 @@ int printSystemInfo() {
     const std::string below = render::gpuMinimumError(gpu);
     std::printf("Minimum spec: %s\n", below.empty() ? "OK" : below.c_str());
     return below.empty() ? 0 : 2;
+}
+
+// --benchmark가 끝났을 때: 보고서 파일과 자동 시험이 읽는 BENCHMARK 줄
+bool writeBenchmark(const Benchmark& bench, const ProjectSettings& project, const GameMainSpec& spec,
+                    const render::Renderer& renderer, const MatchOptions& match, const std::string& path) {
+    BenchmarkInfo info;
+    info.game = project.name.empty() ? spec.module->name : project.name;
+    info.gameVersion = spec.build.gameVersion;
+    info.commit = spec.build.commit;
+    char sim[24];
+    std::snprintf(sim, sizeof(sim), "%016llx", static_cast<unsigned long long>(spec.build.simVersion));
+    info.simVersion = sim;
+    info.determinismGroup = net::determinismGroup();
+    info.cpu = cpuName();
+    info.gpu = renderer.gpu();
+    info.width = renderer.width();
+    info.height = renderer.height();
+    info.vsync = renderer.vsync();
+    info.seed = match.seed;
+    info.scene = match.scenePath.empty() ? project.scene : match.scenePath;
+    const f32 budgets[] = {project.gpuBudgetOpaqueMs, project.gpuBudgetShadowMs, project.gpuBudgetPostMs,
+                           project.gpuBudgetVfxMs,    project.gpuBudgetUiMs,     project.gpuBudgetSpareMs};
+    static_assert(std::size(budgets) == std::size(info.gpuBudgetMs), "one budget per GPU pass + spare");
+    std::copy(std::begin(budgets), std::end(budgets), std::begin(info.gpuBudgetMs));
+
+    const BenchmarkResult result = bench.result();
+    const std::string text = Benchmark::report(info, result);
+    std::printf("%s\n", Benchmark::summaryLine(result).c_str());
+    std::fflush(stdout);
+    if (!writeTextFile(path, text)) {
+        MEALKIT_ERROR("Cannot write the benchmark report: %s", path.c_str());
+        return false;
+    }
+    MEALKIT_INFO("Benchmark report: %s", path.c_str());
+    return true;
 }
 
 // --exit-tick에 닿았을 때: 자동 시험이 읽는 줄(FINAL, SHADOW, REWIND)을 쓰고 종료 코드를 돌려준다
@@ -138,12 +175,23 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
         return 1;
     }
     if (win.systemInfo) return printSystemInfo();
+    if (win.benchmarkSeconds > 0.0) { // 벤치마크: 매번 같은 매치 (고정 시드 + 봇), 화면 동기 없이, 소리 없이
+        if (opt.mode != MatchOptions::Mode::Offline) {
+            std::printf("--benchmark runs offline only (no --host/--join)\n");
+            return 1;
+        }
+        win.bot = true;
+        win.mute = true;
+        if (!win.windowGiven) win.vsync = false;
+        if (opt.seed == 0) opt.seed = 1;
+    }
     return runGame(std::move(opt), win, spec);
 }
 
 int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec, const GameRunOptions& run) {
     const GameModule& module = *spec.module;
-    const bool automated = opt.exitTick > 0 || win.frames > 0;
+    const bool benchmark = win.benchmarkSeconds > 0.0;
+    const bool automated = opt.exitTick > 0 || win.frames > 0 || benchmark;
     if (automated) log::setDialogs(false);
 
     MEALKIT_INFO("CPU: %s", cpuName().c_str()); // 다른 PC 결정론 기록용
@@ -280,6 +328,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     render::DrawList drawList;
     f64 lastTime = nowSeconds();
     FrameStats perf; // 성능 숫자 (창 제목·F1·perf 로그, mealkit/game/FrameStats.h)
+    Benchmark bench({win.benchmarkSeconds}); // --benchmark (perf의 묶음을 쌓는다)
     u32 perfLogCounter = 0;
     int exitCode = 0;
     f64 exitDeadline = 0.0;  // --exit-tick 도달 후 종료 시각
@@ -398,7 +447,12 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         if (lastFrame) break;
 
         // ---- 창 제목에 상태 표시 (4Hz) ----
-        if (perf.update(dt, {&renderer, &session, &audio, game})) {
+        const bool perfSample = perf.update(dt, {&renderer, &session, &audio, game});
+        if (benchmark && bench.frame(dt, game->started(), perfSample ? &perf.sample() : nullptr)) {
+            exitCode = writeBenchmark(bench, project.settings, spec, renderer, opt, win.benchmarkPath) ? 0 : 1;
+            break;
+        }
+        if (perfSample) {
             // 플레이어에게 보이는 글자는 문자열 표(assets/strings), 성능 숫자는 개발용이라 영어 그대로
             std::string status = lobbyStatus(matches, front.strings());
             const bool running = status.empty();

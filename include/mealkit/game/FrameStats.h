@@ -1,13 +1,12 @@
 #pragma once
 
 #include "mealkit/core/Types.h"
+#include "mealkit/render/Renderer.h"
 
 #include <string>
+#include <vector>
 
 namespace mealkit {
-namespace render {
-class Renderer;
-}
 namespace net {
 class LockstepSession;
 }
@@ -39,6 +38,7 @@ struct FrameSample {
     u32 frames = 0;
     f64 frameMs = 0.0;      // 평균 프레임 시간
     f64 worstFrameMs = 0.0; // 주기 안에서 가장 긴 프레임
+    f64 p99FrameMs = 0.0;   // 1% 최악 프레임: 이보다 긴 프레임이 1% (frameMsPercentile 99)
     f64 fps = 0.0;
 
     bool hasGame = false;
@@ -54,11 +54,20 @@ struct FrameSample {
     bool hasRenderer = false;
     u32 drawCalls = 0, instances = 0;
     bool vsync = false;
+    bool hasGpuTime = false; // 타임스탬프 쿼리 결과가 있다 (render::RenderStats::gpuValid)
+    f64 gpuMs = 0.0;         // 평균 GPU 프레임 시간
+    f64 gpuPassMs[render::kGpuPassCount] = {};
+    u64 gpuMemoryUsed = 0, gpuMemoryBudget = 0; // 바이트 (모르면 0)
+
+    u64 processMemory = 0, processMemoryPeak = 0; // 바이트 (platform processMemory, 렌더러가 있을 때)
 
     bool hasAudio = false;
     u32 realVoices = 0, virtualVoices = 0;
     f64 audioMs = 0.0;
 };
+
+// 프레임 시간(초) 목록의 백분위수 (ms). 목록을 정렬한다. 비면 0
+f64 frameMsPercentile(std::vector<f64>& frameSeconds, f64 percent);
 
 class FrameStats {
 public:
@@ -80,6 +89,10 @@ private:
     f64 m_elapsed = 0.0;
     f64 m_worst = 0.0;
     u32 m_frames = 0;
+    std::vector<f64> m_frameTimes;
+    f64 m_gpuMs = 0.0;
+    f64 m_gpuPassMs[render::kGpuPassCount] = {};
+    u32 m_gpuFrames = 0;
     FrameSample m_sample;
 };
 

@@ -2,6 +2,7 @@
 
 #include "mealkit/core/Version.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 
@@ -56,6 +57,8 @@ void printGameUsage(const char* name, bool headless) {
                 "  --debug-ui             start with the debug UI shown (F1, development builds)\n"
                 "  --settings             start with the settings screen open\n"
                 "  --lang <code>          language of the game text (assets/strings/<code>.txt, default: language in mealkit.project)\n"
+                "  --benchmark [seconds]  fixed seed, bot input, vsync off: measure 30 s after a 3 s warm-up, write benchmark.txt, exit\n"
+                "  --benchmark-out <txt>  benchmark report path (default benchmark.txt)\n"
                 "  --headless --help      run without a window (headless options, replay)\n");
 }
 
@@ -135,6 +138,10 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
         else if (a == "--debug-ui") w.debugUi = true;
         else if (a == "--settings") w.openSettings = true;
         else if (a == "--lang" && next(v)) w.language = v;
+        else if (a == "--benchmark") { // [초]
+            w.benchmarkSeconds = 30.0;
+            if (i + 1 < argc && argv[i + 1][0] != '-') w.benchmarkSeconds = std::max(1.0, std::atof(argv[++i]));
+        } else if (a == "--benchmark-out" && next(v)) w.benchmarkPath = v;
         else if (a == "--help" || a == "-h") return false;
         else {
             std::printf("Unknown option: %s\n", a.c_str());
