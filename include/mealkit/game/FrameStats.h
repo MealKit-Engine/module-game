@@ -52,7 +52,7 @@ struct FrameSample {
     bool desynced = false;
 
     bool hasRenderer = false;
-    u32 drawCalls = 0, instances = 0;
+    u32 drawCalls = 0, instances = 0, culled = 0;
     bool vsync = false;
     bool hasGpuTime = false; // 타임스탬프 쿼리 결과가 있다 (render::RenderStats::gpuValid)
     f64 gpuMs = 0.0;         // 평균 GPU 프레임 시간

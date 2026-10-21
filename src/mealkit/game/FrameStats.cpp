@@ -29,7 +29,7 @@ std::vector<std::string> items(const FrameSample& s) {
         add(std::snprintf(buf, sizeof(buf), "rtt %.0f ms", s.rttMs));
         add(std::snprintf(buf, sizeof(buf), "net %.1f/%.1f KB/s", s.sentBytesPerSec / 1024.0, s.recvBytesPerSec / 1024.0));
     }
-    if (s.hasRenderer) add(std::snprintf(buf, sizeof(buf), "%u draws %u inst", s.drawCalls, s.instances));
+    if (s.hasRenderer) add(std::snprintf(buf, sizeof(buf), "%u draws %u inst (%u culled)", s.drawCalls, s.instances, s.culled));
     if (s.processMemory) add(std::snprintf(buf, sizeof(buf), "mem %.0f MB", s.processMemory / 1048576.0));
     if (s.gpuMemoryBudget)
         add(std::snprintf(buf, sizeof(buf), "vram %.0f/%.0f MB", s.gpuMemoryUsed / 1048576.0, s.gpuMemoryBudget / 1048576.0));
@@ -99,6 +99,7 @@ bool FrameStats::update(f64 dt, const FrameSources& from) {
         s.hasRenderer = true;
         s.drawCalls = from.renderer->stats().drawCalls;
         s.instances = from.renderer->stats().instances;
+        s.culled = from.renderer->stats().culled;
         s.vsync = from.renderer->vsync();
         if (m_gpuFrames) {
             s.hasGpuTime = true;
