@@ -61,6 +61,9 @@ MEALKIT_STRUCT(ProjectSettings) {
     MEALKIT_VIEW_FIELD(f32, gpuBudgetVfxMs, 1.0f, "GPU budget: effects and transparency (ms)");
     MEALKIT_VIEW_FIELD(f32, gpuBudgetUiMs, 0.5f, "GPU budget: UI (ms)");
     MEALKIT_VIEW_FIELD(f32, gpuBudgetSpareMs, 1.0f, "GPU budget: spare (ms)");
+    // 반사 프로브 (docs/ROADMAP.md 2단계): 씬당 쓰는 수(넘는 프로브는 버린다)와 큐브 면 크기 (2의 거듭제곱으로 내린다)
+    MEALKIT_VIEW_FIELD(u32, probeMaxCount, 8, "Reflection probes per scene (max)");
+    MEALKIT_VIEW_FIELD(u32, probeSize, 128, "Reflection probe size (px)");
     // 에셋 예산 (asset/Budget.h): 모델 종류는 assets/models/ 아래 폴더(characters, props, environment). 넘으면 불러올 때 경고하고
     // 에디터 인스펙터·Blender 애드온이 같은 값으로 보여 준다. 기본값은 최소 사양 내장 그래픽 기준 (벤치마크로 고친다)
     MEALKIT_VIEW_FIELD(u32, budgetCharactersTriangles, asset::kDefaultBudgets[0].triangles, "Budget, characters: triangles");

@@ -72,6 +72,7 @@ bool loadMatchData(const GameTypes& types, const MatchDataOptions& options, asse
     asset::ModelBudget budgets[asset::kModelKindCount];
     modelBudgets(out.project.settings, budgets);
     models.setBudgets(budgets); // 넘는 모델은 불러올 때 경고
+    models.setProbeLimit(out.project.settings.probeMaxCount);
     if (options.scene) {
         out.scene = *options.scene;
     } else {
