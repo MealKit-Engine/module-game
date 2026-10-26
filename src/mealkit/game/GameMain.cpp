@@ -309,6 +309,9 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     // 소리: 기본 출력 장치 (없으면 소리 없이 돈다). 창이 포커스를 잃으면 음소거 (플레이어 설정에서 끌 수 있다)
     audio::Engine audio;
     audio.init({project.settings.audioVoices, win.mute});
+#if MEALKIT_LIVE
+    audio::addLiveService(liveServer, [&audio] { return &audio; }); // MealKit Audio: 게임에서 재생, 다시 읽기, 상태
+#endif
     feedback::Player feedback(audio); // assets/feedback.table: 틱 이벤트 → 소리·흔들림·번쩍임·화면 정지
 
     // 화면 쪽 서비스: 입력 액션(assets/input.bindings + 플레이어가 바꾼 키), 문자열 표, 게임 UI, 플레이어 설정, 화면용 튜닝.
