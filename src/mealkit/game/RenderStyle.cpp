@@ -11,7 +11,8 @@ constexpr u32 kMaxRampWidth = 1024; // 램프는 첫 줄만 쓴다. 더 큰 그�
 } // namespace
 
 bool applyRenderStyle(const ProjectSettings& settings, render::Renderer& renderer, RenderStyleState& state) {
-    renderer.setLightsPerObject(settings.pointLightsPerObject); // 값 하나라 매번 넘긴다
+    renderer.setLightsPerObject(settings.pointLightsPerObject); // 값 몇 개라 매번 넘긴다
+    renderer.setShadows({settings.shadows, settings.shadowCascades, settings.shadowMapSize, settings.shadowDistance});
     const std::string rampFile = settings.toonRamp.empty() ? std::string() : findAsset("assets/" + settings.toonRamp);
     const unsigned long long rampTime = rampFile.empty() ? 0 : fileWriteTime(rampFile);
     if (state.applied && state.lightingModel == settings.lightingModel && state.toonRamp == settings.toonRamp &&

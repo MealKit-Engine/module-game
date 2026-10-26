@@ -66,6 +66,11 @@ MEALKIT_STRUCT(ProjectSettings) {
     MEALKIT_VIEW_FIELD(u32, probeSize, 128, "Reflection probe size (px)");
     // 점광원 (docs/ROADMAP.md 2단계): 물체마다 쓰는 빛 수 (1..8). 많을수록 픽셀 셰이더가 무겁다
     MEALKIT_VIEW_FIELD(u32, pointLightsPerObject, 4, "Point lights per object (1-8)");
+    // 태양 그림자 (docs/ROADMAP.md 2단계, render::ShadowSettings): 단계 수, 단계 하나의 맵 크기, 카메라에서 그림자가 닿는 거리
+    MEALKIT_VIEW_FIELD(bool, shadows, true, "Sun shadows");
+    MEALKIT_VIEW_FIELD(u32, shadowCascades, 2, "Shadow cascades (1-2)");
+    MEALKIT_VIEW_FIELD(u32, shadowMapSize, 1024, "Shadow map size (px)");
+    MEALKIT_VIEW_FIELD(f32, shadowDistance, 40.0f, "Shadow distance (m)");
     // 에셋 예산 (asset/Budget.h): 모델 종류는 assets/models/ 아래 폴더(characters, props, environment). 넘으면 불러올 때 경고하고
     // 에디터 인스펙터·Blender 애드온이 같은 값으로 보여 준다. 기본값은 최소 사양 내장 그래픽 기준 (벤치마크로 고친다)
     MEALKIT_VIEW_FIELD(u32, budgetCharactersTriangles, asset::kDefaultBudgets[0].triangles, "Budget, characters: triangles");
