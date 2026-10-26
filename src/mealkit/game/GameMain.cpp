@@ -25,6 +25,7 @@
 #include "mealkit/game/GameOptions.h"
 #include "mealkit/game/MatchService.h"
 #include "mealkit/game/ProjectSettings.h"
+#include "mealkit/game/RenderStyle.h"
 #include "mealkit/live/Server.h"
 #include "mealkit/net/Lockstep.h"
 #include "mealkit/net/Socket.h"
@@ -44,6 +45,7 @@
 #endif
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <iterator>
@@ -219,6 +221,8 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     if (!loadMatchData(gameTypes(module), dataOptions, models, data))
         MEALKIT_FATAL("Cannot load the match data (see log)");
     const ProjectFile& project = data.project;
+    RenderStyleState renderStyle;
+    applyRenderStyle(project.settings, renderer, renderStyle); // 조명 모델·툰 램프 (파이프라인은 renderer.init이 이미 만들었다)
     if (spec.defaults && data.gameProject.data()) spec.defaults(opt, data.gameProject.data()); // 헤드리스와 같은 기본값 (포트·인원)
     opt.inputDelay = msToTicks(opt.inputDelayMs); // 틱레이트(프로젝트 설정)를 안 뒤
     const scene::Scene& scene = data.scene;
@@ -441,6 +445,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
             drawList.clear();
             game->buildFrame(ctx, now, frame, drawList);
             front.afterBuildFrame(frame);
+            frame.time = static_cast<f32>(std::fmod(now, 4096.0)); // 바람 흔들림 (f32 정밀도 안에서 돈다)
 #if MEALKIT_DEBUG_UI
             if (debugUiShown) {
                 debugUi.newFrame();

@@ -25,6 +25,9 @@ namespace mealkit::game {
 inline constexpr const char* kProjectFileName = "mealkit.project";
 inline constexpr const char* kGameSettingsPrefix = "game.";
 
+// 조명 모델 (스타일 프리셋, render::LightingModel과 같은 순서): 게임 아트 방향의 가장 큰 스위치. game::applyRenderStyle이 렌더러에 넘긴다
+MEALKIT_ENUM(LightingModelSetting, u8, Pbr, Toon, Unlit);
+
 // 필드 설명은 에디터 글자라 영어로 쓰고 한국어는 engine/res/strings/ko.txt (docs/CODING_MODEL.md "에디터 UI 문자열과 언어")
 MEALKIT_STRUCT(ProjectSettings) {
     MEALKIT_FIELD_FLAGS(std::string, name, {}, "Game name (exe name)", reflect::kFieldView | reflect::kFieldReadOnly);
@@ -39,6 +42,9 @@ MEALKIT_STRUCT(ProjectSettings) {
     MEALKIT_FIELD_FLAGS(std::string, created, {}, "Development started (YYYY-MM-DD)",
                         reflect::kFieldView | reflect::kFieldReadOnly);
     MEALKIT_VIEW_FIELD(u32, audioVoices, 32, "Sound voices mixed at once");
+    // 스타일 프리셋 (docs/CODING_MODEL.md "셰이더 코드"): 화면만 바뀌어 해시 밖. 머티리얼 기능은 모델의 glTF extras
+    MEALKIT_VIEW_FIELD(LightingModelSetting, lightingModel, LightingModelSetting::Pbr, "Lighting model (Pbr, Toon, Unlit)");
+    MEALKIT_VIEW_FIELD(std::string, toonRamp, {}, "Toon ramp image (under assets, left is shadow, right is lit, empty for 3 steps)");
     // 시뮬레이션 틱레이트 (콘텐츠 해시에 들어간다). 시간 값은 데이터에 초로 적혀 있어 바꿔도 튜닝·표를 고치지 않는다.
     // 60은 반응·충돌이 좋아지지만 시뮬레이션 CPU와 입력 패킷이 2배다 (물체 수천 개짜리 게임에는 쓰지 않는다)
     MEALKIT_FIELD(u32, tickRate, 30, "Simulation ticks per second (30 or 60)");
