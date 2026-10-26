@@ -15,7 +15,7 @@ std::string loadTuning(const reflect::TypeInfo& type, void* data, const std::str
         return {};
     }
     std::string error;
-    if (!reflect::loadTextFile(type, data, file, &error)) {
+    if (!reflect::loadTextFile(type, data, file, text::kTuning, &error)) {
         MEALKIT_ERROR("Cannot read tuning %s: %s", file.c_str(), error.c_str());
         return {};
     }
@@ -44,7 +44,7 @@ void LiveTuning::reload() {
     if (m_writeTime == 0) return; // 파일 없음: 기본값 그대로
     reflect::Instance fresh(*m_value.type()); // 지운 줄은 기본값으로 돌아가게 새 값에 읽는다
     std::string error;
-    if (!reflect::loadTextFile(*m_value.type(), fresh.data(), m_path, &error)) {
+    if (!reflect::loadTextFile(*m_value.type(), fresh.data(), m_path, text::kTuning, &error)) {
         MEALKIT_WARN("Cannot read %s: %s", m_path.c_str(), error.c_str());
         return;
     }

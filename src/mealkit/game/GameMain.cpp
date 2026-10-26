@@ -25,6 +25,7 @@
 #include "mealkit/game/GameOptions.h"
 #include "mealkit/game/MatchService.h"
 #include "mealkit/game/ProjectSettings.h"
+#include "mealkit/live/Server.h"
 #include "mealkit/net/Lockstep.h"
 #include "mealkit/net/Socket.h"
 #include "mealkit/online/Online.h"
@@ -221,6 +222,20 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     if (spec.defaults && data.gameProject.data()) spec.defaults(opt, data.gameProject.data()); // 헤드리스와 같은 기본값 (포트·인원)
     opt.inputDelay = msToTicks(opt.inputDelayMs); // 틱레이트(프로젝트 설정)를 안 뒤
     const scene::Scene& scene = data.scene;
+
+#if MEALKIT_LIVE
+    // 라이브 연결 (도구 사이 약속, mealkit/live/Server.h): 개발 빌드만. 접속 정보는 프로젝트의 build/live/game-<pid>.json
+    live::Server liveServer;
+    {
+        live::ServerConfig c;
+        c.kind = "game";
+        const std::string projectFile = findAsset(kProjectFileName);
+        c.projectDir = projectFile.empty() ? std::string() : parentDirectory(projectFile);
+        c.projectName = project.settings.name.empty() ? module.name : project.settings.name;
+        liveServer.start(c);
+        liveServer.addTopic("stats"); // game::FrameStats::json, 보고 주기마다
+    }
+#endif
 
     // 온라인 서비스(Steam): 빌드에 들어 있으면 시작할 때 로그인한다 (메뉴의 [Steam 방 만들기], 친구 초대 수락)
     const bool steamAsked = opt.mode == MatchOptions::Mode::SteamHost || opt.mode == MatchOptions::Mode::SteamJoin;
@@ -455,6 +470,10 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
             exitCode = writeBenchmark(bench, project.settings, spec, renderer, opt, win.benchmarkPath) ? 0 : 1;
             break;
         }
+#if MEALKIT_LIVE
+        if (perfSample && liveServer.listening("stats")) liveServer.publish("stats", perf.json());
+        liveServer.update();
+#endif
         if (perfSample) {
             // 플레이어에게 보이는 글자는 문자열 표(assets/strings), 성능 숫자는 개발용이라 영어 그대로
             std::string status = lobbyStatus(matches, front.strings());

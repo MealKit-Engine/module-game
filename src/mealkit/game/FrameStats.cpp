@@ -134,4 +134,42 @@ std::string FrameStats::line() const { return join(items(m_sample), " | "); }
 
 std::string FrameStats::lines() const { return join(items(m_sample), "\n"); }
 
+std::string FrameStats::json() const {
+    const FrameSample& s = m_sample;
+    std::string out;
+    char buf[256];
+    std::snprintf(buf, sizeof(buf), "{\"seconds\":%.3f,\"frames\":%u,\"fps\":%.2f,\"frameMs\":%.3f,\"worstFrameMs\":%.3f,\"p99FrameMs\":%.3f",
+                  s.seconds, s.frames, s.fps, s.frameMs, s.worstFrameMs, s.p99FrameMs);
+    out += buf;
+    if (s.hasGame) {
+        std::snprintf(buf, sizeof(buf), ",\"game\":{\"tick\":%u,\"simMsPerTick\":%.4f}", s.tick, s.simMsPerTick);
+        out += buf;
+    }
+    if (s.hasSession) {
+        std::snprintf(buf, sizeof(buf),
+                      ",\"session\":{\"localPlayer\":%u,\"players\":%u,\"rttMs\":%.1f,\"sentBytesPerSec\":%u,\"recvBytesPerSec\":%u,\"desynced\":%s}",
+                      s.localPlayer, s.playerCount, static_cast<f64>(s.rttMs), s.sentBytesPerSec, s.recvBytesPerSec, s.desynced ? "true" : "false");
+        out += buf;
+    }
+    if (s.hasRenderer) {
+        std::snprintf(buf, sizeof(buf), ",\"render\":{\"drawCalls\":%u,\"instances\":%u,\"culled\":%u,\"vsync\":%s", s.drawCalls, s.instances,
+                      s.culled, s.vsync ? "true" : "false");
+        out += buf;
+        if (s.hasGpuTime) {
+            std::snprintf(buf, sizeof(buf), ",\"gpuMs\":%.3f", s.gpuMs);
+            out += buf;
+        }
+        std::snprintf(buf, sizeof(buf), ",\"gpuMemoryUsed\":%llu,\"gpuMemoryBudget\":%llu,\"processMemory\":%llu}",
+                      static_cast<unsigned long long>(s.gpuMemoryUsed), static_cast<unsigned long long>(s.gpuMemoryBudget),
+                      static_cast<unsigned long long>(s.processMemory));
+        out += buf;
+    }
+    if (s.hasAudio) {
+        std::snprintf(buf, sizeof(buf), ",\"audio\":{\"realVoices\":%u,\"virtualVoices\":%u,\"audioMs\":%.3f}", s.realVoices, s.virtualVoices,
+                      s.audioMs);
+        out += buf;
+    }
+    return out + "}";
+}
+
 } // namespace mealkit::game

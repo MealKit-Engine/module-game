@@ -83,6 +83,8 @@ public:
     std::string line() const;
     // line()의 항목을 한 줄씩 (F1 오버레이)
     std::string lines() const;
+    // sample()을 JSON 객체 하나로 (라이브 연결 상태 스트림의 "stats" 주제, mealkit/live/Server.h). 없는 출처의 묶음은 뺀다
+    std::string json() const;
 
 private:
     f64 m_period;

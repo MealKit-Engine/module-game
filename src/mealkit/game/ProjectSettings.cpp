@@ -1,6 +1,7 @@
 #include "mealkit/game/ProjectSettings.h"
 
 #include "mealkit/core/Log.h"
+#include "mealkit/core/TextFormat.h"
 #include "mealkit/platform/Paths.h"
 
 #include <algorithm>
@@ -49,6 +50,8 @@ bool loadProjectFile(const std::string& path, ProjectFile& out, std::string* err
             if (!seenKey) out.header += line + "\n";
             continue;
         }
+        u32 version = 1; // 지금은 버전 1뿐이라 migrate가 없다
+        if (text::readFormatLine(line, text::kProject, path, version)) continue;
         seenKey = true;
         // "경로 값" 또는 예전 형식 "키=값"
         size_t keyEnd = 0;
@@ -73,6 +76,7 @@ bool saveProjectFile(const std::string& path, const ProjectFile& project) {
     std::string text = project.header.empty()
                            ? "# MealKit project (경로 값). 에디터 [파일] > [프로젝트 설정]에서 고친다. 게임 항목은 game.\n"
                            : project.header;
+    text += text::formatLine(text::kProject) + "\n";
     reflect::TextFields fields;
     reflect::toText(reflect::typeOf<ProjectSettings>(), &project.settings, fields);
     for (const auto& [key, value] : fields) appendLine(text, key, value);
