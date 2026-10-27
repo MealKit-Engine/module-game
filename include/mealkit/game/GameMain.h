@@ -3,6 +3,7 @@
 #include "mealkit/game/BuildInfo.h"
 #include "mealkit/game/GameInstance.h"
 #include "mealkit/game/Headless.h"
+#include "mealkit/platform/System.h"
 #include "mealkit/platform/Window.h"
 
 #include <string_view>
@@ -61,6 +62,7 @@ GameMainSpec gameMainSpec(const char* name) {
 // 게임의 app/main.cpp에서 한 번 쓴다. MEALKIT_GAME_NAME은 mealkit_add_game()이 넘기는 프로젝트 이름(exe 이름)
 #define MEALKIT_GAME_MAIN(GameClass, HeadlessClass)                                                                    \
     int main(int argc, char** argv) {                                                                                  \
+        ::mealkit::attachParentConsole(); /* 출시 exe는 창 프로그램이다 */                                                 \
         for (int i = 1; i < argc; ++i)                                                                                 \
             if (std::string_view(argv[i]) == "--headless") return mealkitHeadlessMain(argc, argv);                     \
         return ::mealkit::game::runGame(argc, argv,                                                                    \
