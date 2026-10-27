@@ -444,6 +444,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
             render::FrameParams frame;
             drawList.clear();
             game->buildFrame(ctx, now, frame, drawList);
+            feedback.addParticles(drawList); // 연출 표의 effect (불투명 3D 다음에 그린다)
             front.afterBuildFrame(frame);
             frame.time = static_cast<f32>(std::fmod(now, 4096.0)); // 바람 흔들림 (f32 정밀도 안에서 돈다)
 #if MEALKIT_DEBUG_UI
