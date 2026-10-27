@@ -45,6 +45,7 @@ void printGameUsage(const char* name, bool headless) {
     std::printf("Window:\n"
                 "  --vsync <0|1>          vertical sync (default 1)\n"
                 "  --fps <n>              frame cap when vsync is off\n"
+                "  --render-scale <s>     fixed 3D resolution scale 0.25-1 (dynamic resolution off)\n"
                 "  --size <w> <h>         window size\n"
                 "  --debug                enable the D3D12 debug layer\n"
                 "  --gpu-capture          load RenderDoc or PIX if installed; F11 captures the next frame (development builds)\n"
@@ -109,6 +110,7 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
         // ---- 창
         else if (a == "--headless") continue; // 출시 exe의 main이 이미 나눴다
         else if (a == "--vsync" && next(v)) w.vsync = std::atoi(v) != 0, w.windowGiven = true;
+        else if (a == "--render-scale" && next(v)) w.renderScale = static_cast<f32>(std::atof(v));
         else if (a == "--fps" && next(v)) w.fpsCap = std::atof(v), w.windowGiven = true;
         else if (a == "--size" && i + 2 < argc) {
             w.windowGiven = true;

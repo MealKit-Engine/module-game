@@ -338,6 +338,12 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         front.init(c);
         if (win.openSettings) front.settings().open();
     }
+    // 동적 해상도: 자동 실행(시험·벤치마크)은 GPU 속도에 그림이 달라지지 않게 끈다. --render-scale은 배율 고정
+    if (automated || win.renderScale > 0.0f) {
+        const render::ResolutionSettings& r = renderer.resolution();
+        renderer.setDynamicResolution(false, r.minScale, r.budgetMs, r.sharpness);
+        if (win.renderScale > 0.0f) renderer.setRenderScale(win.renderScale);
+    }
 
     GameContext ctx = front.context(window, renderer, models, matches);
     ctx.userFolder = userFolderPath; // 세이브 (자동 실행은 저장하지 않는다)

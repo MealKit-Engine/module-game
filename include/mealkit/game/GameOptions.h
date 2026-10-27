@@ -41,6 +41,7 @@ struct WindowOptions {
     f64 fpsCap = 0.0;
     u32 width = 1280, height = 720;
     bool windowGiven = false; // --size/--vsync/--fps를 줬다: 이번 실행은 플레이어 설정의 화면 항목보다 명령줄
+    f32 renderScale = 0.0f;   // --render-scale: 3D 해상도 배율 고정 (동적 해상도 끔, 0 = 설정대로)
     bool debugLayer = false;
     bool bot = false;        // 로컬 플레이어를 스크립트 입력으로 (헤드리스는 항상)
     bool rewindTest = false; // 끝날 때 기록을 되감아 다시 돌려 보고 결과를 출력

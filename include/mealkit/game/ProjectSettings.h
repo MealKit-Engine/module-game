@@ -61,6 +61,10 @@ MEALKIT_STRUCT(ProjectSettings) {
     MEALKIT_VIEW_FIELD(f32, gpuBudgetVfxMs, 1.0f, "GPU budget: effects and transparency (ms)");
     MEALKIT_VIEW_FIELD(f32, gpuBudgetUiMs, 0.5f, "GPU budget: UI (ms)");
     MEALKIT_VIEW_FIELD(f32, gpuBudgetSpareMs, 1.0f, "GPU budget: spare (ms)");
+    // 동적 해상도 (render::ResolutionSettings): GPU 프레임 시간이 위 예산의 합을 넘으면 3D 해상도를 이 배율까지 낮춘다 (UI는 그대로)
+    MEALKIT_VIEW_FIELD(bool, dynamicResolution, true, "Dynamic resolution (lower 3D resolution over the GPU budget)");
+    MEALKIT_VIEW_FIELD(f32, dynamicResolutionMinScale, 0.5f, "Dynamic resolution: lowest scale (0.25-1)");
+    MEALKIT_VIEW_FIELD(f32, upscaleSharpness, 0.5f, "Upscale sharpening (0-1)");
     // 반사 프로브 (docs/ROADMAP.md 2단계): 씬당 쓰는 수(넘는 프로브는 버린다)와 큐브 면 크기 (2의 거듭제곱으로 내린다)
     MEALKIT_VIEW_FIELD(u32, probeMaxCount, 8, "Reflection probes per scene (max)");
     MEALKIT_VIEW_FIELD(u32, probeSize, 128, "Reflection probe size (px)");
