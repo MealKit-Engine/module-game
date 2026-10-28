@@ -12,6 +12,9 @@
 #include "mealkit/game/GameMain.h"
 
 #include "mealkit/asset/ModelCache.h"
+#if MEALKIT_DEBUG_UI
+#include "mealkit/debug/DebugDrawRender.h"
+#endif
 #include "mealkit/audio/Audio.h"
 #include "mealkit/core/Clock.h"
 #include "mealkit/core/Log.h"
@@ -465,6 +468,8 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
                 ImGui::End();
                 game->debugUi(ctx);
             }
+            // 게임 코드의 debug::line/box/text (글자는 디버그 UI가 켜져 있을 때만)
+            debug::flushDebugDraw(drawList, models.boxMesh(), frame, now, debugUiShown);
 #endif
             const bool active = renderer.beginFrame(frame);
             if (active) drawList.submit(renderer);
