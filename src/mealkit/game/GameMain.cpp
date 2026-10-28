@@ -22,6 +22,7 @@
 #include "mealkit/core/Version.h"
 #include "mealkit/feedback/Feedback.h"
 #include "mealkit/game/Benchmark.h"
+#include "mealkit/game/BugReport.h"
 #include "mealkit/game/FrameStats.h"
 #include "mealkit/game/DesyncDump.h"
 #include "mealkit/game/Frontend.h"
@@ -393,6 +394,12 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     bool loadingShown = false; // 세션이 Running이 된 뒤 로딩 화면을 한 번 그렸다 (그다음 프레임에 start)
     u32 frameCount = 0;        // --frames
     bool replayStopped = false; // 리플레이가 갈라져 멈췄다
+    // 버그 리포트 (F9, game/BugReport.h): 개발 빌드는 한 줄을 적는 창 → 스크린샷 요청 → 다음 프레임에 묶는다 (endFrame이 PNG를 쓴 뒤)
+    enum class BugStep { None, Note, Shot, Write };
+    BugStep bugStep = BugStep::None;
+    char bugNote[256] = {};
+    const std::string bugFolder = project.settings.bugReports && (!automated || win.bugReportAt) ? userFolder(project.settings) : std::string();
+    const std::string bugShot = bugFolder + "/" + kBugReportFolder + "/screenshot.png";
 
     while (window.pumpMessages()) {
         const f64 now = nowSeconds();
@@ -402,10 +409,36 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         if (exitDeadline > 0.0 && now >= exitDeadline) break;
 
         // Esc: 메뉴가 있는 게임은 게임이 쓴다 (일시정지·뒤로). 없는 게임은 끝낸다 (설정 화면이 열려 있으면 화면을 닫는다)
-        if (!menus && input.keyPressed(key::Escape) && !front.settings().isOpen()) break;
+        if (!menus && input.keyPressed(key::Escape) && !front.settings().isOpen() && bugStep == BugStep::None) break;
         if (input.keyPressed('V') && !front.ui().editingText()) renderer.setVsync(!renderer.vsync());
         if (input.keyPressed(key::F12)) renderer.requestCapture("screenshot.png");
         if (input.keyPressed(key::F11)) rhi::captureNextGpuFrame(); // --gpu-capture (도구가 없으면 아무것도 안 한다)
+        if (bugStep == BugStep::Write) {
+            BugReportInfo info;
+            info.build = spec.build;
+            info.contentHash = data.contentHash;
+            info.scenePath = opt.scenePath.empty() ? project.settings.scene : opt.scenePath;
+            info.tuningPath = opt.tuningPath.empty() ? std::string(kDefaultTuningAsset) : opt.tuningPath;
+            info.tick = game->started() && game->debug() ? game->debug()->timeline().live : 0;
+            info.players = session.playerCount();
+            info.localPlayer = session.localPlayer();
+            info.note = bugNote;
+            writeBugReport(bugFolder, info, game->started() ? gameOptions.recordInputsPath : std::string(), bugShot);
+            bugNote[0] = 0;
+            bugStep = BugStep::None;
+        }
+        if (bugStep == BugStep::Shot) {
+            createDirectories(parentDirectory(bugShot));
+            renderer.requestCapture(bugShot.c_str());
+            bugStep = BugStep::Write;
+        }
+        if (!bugFolder.empty() && bugStep == BugStep::None && input.keyPressed(key::F9) && !front.ui().editingText())
+#if MEALKIT_DEBUG_UI
+            bugStep = BugStep::Note;
+#else
+            bugStep = BugStep::Shot; // 출시 빌드는 글을 적을 창이 없다
+#endif
+        if (!bugFolder.empty() && win.bugReportAt && frameCount == win.bugReportAt) bugStep = BugStep::Shot;
         if (win.gpuCaptureAt && frameCount == win.gpuCaptureAt) rhi::captureNextGpuFrame(false);
         if (window.consumeResize()) renderer.resize(window.width(), window.height());
         if (matches.usesOnline() && input.keyPressed('I') && !front.ui().editingText()) matches.inviteFriends();
@@ -455,7 +488,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         ctx.viewport = {0.0f, 0.0f, static_cast<f32>(window.width()), static_cast<f32>(window.height())};
         ctx.keyboardAllowed = ctx.mouseAllowed = window.focused();
 #if MEALKIT_DEBUG_UI
-        if (input.keyPressed(key::F1) || (win.debugUi && !debugUiReady)) {
+        if (input.keyPressed(key::F1) || (win.debugUi && !debugUiReady) || (bugStep == BugStep::Note && !debugUiShown)) {
             if (!debugUiReady) debugUiReady = debugUi.init(window, renderer, {});
             debugUiShown = debugUiReady && !debugUiShown;
         }
@@ -496,10 +529,22 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
                                         ImVec2(0.0f, 1.0f)); // 왼쪽 아래 (게임 창은 왼쪽 위)
                 if (ImGui::Begin("MealKit", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
                     ImGui::TextUnformatted(perfText.c_str());
-                    ImGui::TextDisabled("F1: hide | V: vsync | F12: screenshot");
+                    ImGui::TextDisabled("F1: hide | V: vsync | F9: bug report | F12: screenshot");
                 }
                 ImGui::End();
                 game->debugUi(ctx);
+            }
+            if (bugStep == BugStep::Note && debugUiShown) {
+                ImGui::SetNextWindowPos(ImVec2(static_cast<f32>(window.width()) * 0.5f, static_cast<f32>(window.height()) * 0.5f),
+                                        ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+                if (ImGui::Begin("Bug report", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+                    ImGui::TextUnformatted("What happened? (Enter: save, Esc: cancel)");
+                    if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+                    if (ImGui::InputText("##note", bugNote, sizeof(bugNote), ImGuiInputTextFlags_EnterReturnsTrue))
+                        bugStep = BugStep::Shot; // 다음 프레임은 이 창 없이 찍는다
+                    else if (ImGui::IsKeyPressed(ImGuiKey_Escape)) bugStep = BugStep::None;
+                }
+                ImGui::End();
             }
             // 게임 코드의 debug::line/box/text (글자는 디버그 UI가 켜져 있을 때만)
             debug::flushDebugDraw(drawList, models.boxMesh(), frame, now, debugUiShown);

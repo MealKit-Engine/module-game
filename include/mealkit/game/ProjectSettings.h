@@ -44,6 +44,8 @@ MEALKIT_STRUCT(ProjectSettings) {
     MEALKIT_VIEW_FIELD(u32, audioVoices, 32, "Sound voices mixed at once");
     // 리플레이 (game/InputRecord.h): 매치마다 사용자 폴더 replays/에 입력 기록을 남긴다 (4인 30분 약 2 MB). 0이면 남기지 않는다
     MEALKIT_VIEW_FIELD(u32, keepReplays, 20, "Replays kept in the user folder (0: do not record)");
+    // 버그 리포트 묶음 (game/BugReport.h): F9로 사용자 폴더 bugreports/에 입력 기록·로그·스크린샷 zip. 출시 빌드에도 들어간다
+    MEALKIT_VIEW_FIELD(bool, bugReports, true, "F9 saves a bug report (input recording, log, screenshot)");
     // 스타일 프리셋 (docs/CODING_MODEL.md "셰이더 코드"): 화면만 바뀌어 해시 밖. 머티리얼 기능은 모델의 glTF extras
     MEALKIT_VIEW_FIELD(LightingModelSetting, lightingModel, LightingModelSetting::Pbr, "Lighting model (Pbr, Toon, Unlit)");
     MEALKIT_VIEW_FIELD(std::string, toonRamp, {}, "Toon ramp image (under assets, left is shadow, right is lit, empty for 3 steps)");

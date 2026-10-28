@@ -65,6 +65,7 @@ void InputRecordWriter::write(const net::TickInputs& inputs, u64 hash) {
     tick.insert(tick.end(), inputs.commands, inputs.commands + inputs.commandBytes);
     put(tick, hash, 8);
     std::fwrite(tick.data(), 1, tick.size(), m_file);
+    std::fflush(m_file); // 버그 리포트가 매치 중에 이 파일을 읽는다 (튕겨도 그 틱까지 남는다)
 }
 
 void InputRecordWriter::close() {
