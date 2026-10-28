@@ -16,6 +16,7 @@
 #include "mealkit/scene/Scene.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <ctime>
 #include <memory>
 #include <string>
@@ -194,6 +195,13 @@ int runHeadless(int argc, char** argv) {
                 return Game::botInput(tick, session.localPlayer());
             },
             [](const World&) {});
+        // 튕김 흉내: 처음 이어받은 호스트만, 이 틱을 넘는 순간 (그 뒤에 이어받은 사람은 튕기지 않는다)
+        if (options.abortHostTick && session.isHost() && session.hostMigrations() == 1 && sim.started() &&
+            tickBefore <= options.abortHostTick && sim.nextTick() > options.abortHostTick) {
+            MEALKIT_WARN("--abort-host-at %u: exiting without closing the session", options.abortHostTick);
+            std::fflush(stdout);
+            std::_Exit(9);
+        }
         if (sim.finished() && exitDeadline == 0.0) {
             printFinal(sim.nextTick() - 1, sim.world().hash(), session.desynced());
             exitCode = session.desynced() ? 2 : 0;

@@ -28,6 +28,7 @@ struct MatchOptions {
     u32 physicsThreads = 0; // 0 = 자동
     u32 exitTick = 0;       // 이 틱을 실행하면 FINAL을 쓰고 끝 (헤드리스는 재생이 아니면 필수)
     bool shadow = false;    // 그림자 시뮬레이션
+    u32 abortHostTick = 0;  // --abort-host-at: 처음 이어받은 호스트가 이 틱을 넘으면 끊김을 알리지 않고 끝낸다 (튕김 흉내, 호스트 이전 시험)
     u32 desyncTestTick = 0; // --desync-test: 이 틱에 물리를 조금 바꿔 일부러 디싱크를 낸다 (디싱크 진단 시험)
     bool anyBuild = false;  // 호스트: 다른 빌드의 피어도 받는다 (컴파일러 비교 시험)
     std::string playerName; // --name: 로비 이름 (다시 들어올 때 같은 이름이면 예전 슬롯, 재접속 시험)

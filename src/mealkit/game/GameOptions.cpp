@@ -31,6 +31,7 @@ void printGameUsage(const char* name, bool headless) {
                 "  --exit-tick <t>        print the state hash after tick t and exit%s\n"
                 "  --shadow               run a shadow simulation and compare state hashes every tick\n"
                 "  --hash-log <file>      write \"<tick> <hash>\" for every tick\n"
+                "  --abort-host-at <t>    headless: the first peer that took over as host exits at tick t without closing the session\n"
                 "  --desync-test <t>      nudge the physics before tick t to cause a desync (dumps go to build/desync)\n"
                 "  --record-inputs <file> save the confirmed inputs and hashes of every tick\n",
                 headless ? " (default: --players)" : "", headless ? " (required unless replaying)" : "");
@@ -103,6 +104,7 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
         else if (a == "--tuning" && next(v)) o.tuningPath = v;
         else if (a == "--exit-tick" && next(v)) o.exitTick = u32Of(v);
         else if (a == "--shadow") o.shadow = true;
+        else if (a == "--abort-host-at" && next(v)) o.abortHostTick = u32Of(v);
         else if (a == "--desync-test" && next(v)) o.desyncTestTick = u32Of(v);
         else if (a == "--hash-log" && next(v)) o.hashLogPath = v;
         else if (a == "--record-inputs" && next(v)) o.recordInputsPath = v;
