@@ -260,6 +260,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         MatchServiceConfig c;
         c.contentHash = data.contentHash;
         c.acceptOtherBuilds = opt.anyBuild;
+        c.playerName = opt.playerName;
         c.gameName = project.settings.name.empty() ? module.name : project.settings.name;
         c.defaultPort = opt.port;
         c.defaultMaxPlayers = opt.maxPlayers;

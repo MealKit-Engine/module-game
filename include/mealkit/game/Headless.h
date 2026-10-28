@@ -130,6 +130,7 @@ int runHeadless(int argc, char** argv) {
     net::LockstepSession session;
     session.setContentHash(data.contentHash);
     session.setAcceptOtherBuilds(options.anyBuild);
+    if (!options.playerName.empty()) session.setLocalName(options.playerName);
     session.setConditions({options.netLagMs, options.netJitterMs, options.netLossPercent});
     const BuildInfo build = MEALKIT_THIS_BUILD; // 게임의 Headless.cpp에서 펼쳐진다 (빌드 정보 헤더)
     session.setBuild(build.simVersion, build.gameVersion);

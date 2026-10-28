@@ -27,6 +27,8 @@
 //   - 해시 로그·입력 기록 파일 (PlayOptions::hashLogPath, recordInputsPath): 빌드·플랫폼 사이 비교 (game/InputRecord.h)
 //   - 디싱크 덤프 (PlayOptions::desyncDumpDir): 여러 명 매치에서 스냅샷을 kKeepDesyncSnapshots개 남기고, 세션이 디싱크를 알리면
 //     갈라진 틱 앞의 스냅샷에서 그 틱까지 다시 돌려 상태를 파일로 쓴다 (game/DesyncDump.h). 지금 상태는 그대로 둔다
+//   - 중간 참가·재접속: 호스트는 세션이 원하면 틱 사이에 스냅샷 바이트를 준다(provideSnapshot). 들어온 쪽은 첫 update에서
+//     스냅샷을 불러 그 틱부터 돌리고, 따라잡는 동안(catchingUp)은 한 프레임에 kJoinCatchUpTicks까지 돌린다
 //
 // World 약속: state(MEALKIT_STRUCT, state.tick), physics, events, step(const net::TickInputs&), hash().
 // 매치를 시작할 때 reset(World&, 물리 스레드 수)으로 진짜·그림자 World를 똑같이 초기화한다.
@@ -43,6 +45,7 @@ public:
     static constexpr u32 kKeepSnapshots = 40;     // 약 3분 20초를 되감을 수 있다
     static constexpr u32 kKeepDesyncSnapshots = 3; // 디싱크 덤프용 (기록·되감기가 꺼진 여러 명 매치): 호스트가 알아채는 지연(256틱 안)을 덮는다
     static constexpr int kCatchUpTicks = 8;       // 한 프레임에 따라잡을 최대 틱
+    static constexpr int kJoinCatchUpTicks = 240; // 중간 참가 뒤 따라잡을 때 한 프레임에 돌릴 최대 틱
 
     template <class Reset>
     void start(const PlayOptions& options, f32 tickDt, Reset&& reset) {
@@ -69,6 +72,7 @@ public:
         m_replayError.clear();
         m_history = options.record;
         m_desyncDumped = false;
+        m_joinFailed = false;
         clearHistory();
         m_recordWriter.close();
         m_hashLog.close();
@@ -127,7 +131,13 @@ public:
         if (!m_started || m_finished) return;
         MEALKIT_ZONE("Simulation");
         const f64 simStart = nowSeconds();
-        if (m_paused) {
+        if (m_nextTick == 0 && session.joinTick() > 0 && !joinMatch(session)) return;
+        if (session.catchingUp() && !m_paused) { // 중간 참가: 확정된 틱을 실제 시간보다 빨리
+            int budget = kJoinCatchUpTicks;
+            while (budget-- > 0 && session.canExecute(m_nextTick) && !m_finished && session.catchingUp())
+                executeTick(session, sample, onTick);
+            m_accumulator = 0.0;
+        } else if (m_paused) {
             m_accumulator = 0.0;
             if (m_stepRequests > 0 && !m_viewingPast && session.canExecute(m_nextTick)) {
                 --m_stepRequests;
@@ -145,6 +155,13 @@ public:
             m_accumulator = std::min(m_accumulator, static_cast<f64>(m_tickDt) * kCatchUpTicks);
         }
         if (session.desynced() && !m_desyncDumped && !m_options.desyncDumpDir.empty()) dumpDesync(session);
+        if (session.snapshotWanted() && !m_viewingPast) { // 호스트: 누가 들어온다 (지금 틱 사이의 상태)
+            WorldSnapshot snapshot;
+            saveSnapshot(*m_world, snapshot);
+            std::vector<u8> bytes;
+            writeSnapshotBytes(snapshot, bytes);
+            session.provideSnapshot(m_nextTick, bytes);
+        }
         m_simSeconds += nowSeconds() - simStart;
     }
 
@@ -315,6 +332,34 @@ private:
         world.step(inputs);
     }
 
+    // 중간 참가: 호스트가 보낸 스냅샷으로 World를 바꾸고 그 틱부터 돌린다 (start의 reset은 정적 데이터만 맞춘다).
+    // 같은 id에 다른 바디가 있을 수 있어 물리 바디를 모두 지우고 스냅샷의 것을 만든다. 실패하면 false (매치를 돌리지 않는다)
+    bool joinMatch(net::LockstepSession& session) {
+        std::vector<u8> bytes;
+        if (!session.takeJoinSnapshot(bytes)) return m_joinFailed ? false : true;
+        WorldSnapshot snapshot;
+        bool ok = readSnapshotBytes(bytes.data(), bytes.size(), snapshot) && snapshot.tick == session.joinTick();
+        for (World* world : {m_world.get(), m_shadow.get()}) {
+            if (!world || !ok) continue;
+            world->physics.clearBodies();
+            ok = loadSnapshot(*world, snapshot);
+        }
+        if (!ok) {
+            m_joinFailed = true;
+            MEALKIT_ERROR("Join: the match snapshot of tick %u did not restore to the host's hash (different build or "
+                          "undeclared state)", session.joinTick());
+            return false;
+        }
+        m_nextTick = snapshot.tick;
+        m_previous = m_world->state;
+        m_pending.clear();
+        if (!session.isOffline() && !m_options.desyncDumpDir.empty()) m_history = true; // 디싱크 덤프용 (0틱에서 켜지 못했다)
+        clearHistory();
+        m_inputBase = m_nextTick;
+        MEALKIT_INFO("Joined the match at tick %u (%zu bytes)", m_nextTick, bytes.size());
+        return true;
+    }
+
     // 세션이 알린 디싱크 틱의 상태를 파일로 (한 번). 그 틱 앞의 스냅샷을 불러 그 틱까지 다시 돌린 뒤 지금 상태로 되돌린다
     void dumpDesync(const net::LockstepSession& session) {
         const u32 tick = session.desyncTick();
@@ -387,6 +432,7 @@ private:
 
     bool m_history = false;      // 입력·해시·스냅샷을 남긴다 (PlayOptions::record, 또는 디싱크 덤프)
     bool m_desyncDumped = false;
+    bool m_joinFailed = false;
     InputRecordWriter m_recordWriter;
     HashLog m_hashLog;
 

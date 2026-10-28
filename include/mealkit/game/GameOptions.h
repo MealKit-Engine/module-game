@@ -30,6 +30,7 @@ struct MatchOptions {
     bool shadow = false;    // 그림자 시뮬레이션
     u32 desyncTestTick = 0; // --desync-test: 이 틱에 물리를 조금 바꿔 일부러 디싱크를 낸다 (디싱크 진단 시험)
     bool anyBuild = false;  // 호스트: 다른 빌드의 피어도 받는다 (컴파일러 비교 시험)
+    std::string playerName; // --name: 로비 이름 (다시 들어올 때 같은 이름이면 예전 슬롯, 재접속 시험)
     f32 netLagMs = 0.0f, netJitterMs = 0.0f, netLossPercent = 0.0f; // 네트워크 상태 흉내 (mealkit/net/Conditions.h)
     std::string scenePath, tuningPath;
     std::string hashLogPath, recordInputsPath;
