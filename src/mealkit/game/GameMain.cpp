@@ -23,6 +23,7 @@
 #include "mealkit/feedback/Feedback.h"
 #include "mealkit/game/Benchmark.h"
 #include "mealkit/game/FrameStats.h"
+#include "mealkit/game/DesyncDump.h"
 #include "mealkit/game/Frontend.h"
 #include "mealkit/game/GameData.h"
 #include "mealkit/game/GameOptions.h"
@@ -288,6 +289,8 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     gameOptions.record = win.rewindTest;
     gameOptions.hashLogPath = opt.hashLogPath;
     gameOptions.recordInputsPath = opt.recordInputsPath;
+    gameOptions.desyncDumpDir = desyncDumpFolder(userFolder(project.settings));
+    gameOptions.desyncTestTick = opt.desyncTestTick;
     // 사용자 폴더(세이브·설정·바꾼 키): 자동 실행(--exit-tick)과 참가 창은 쓰지 않는다
     const bool playerFiles = !automated && run.playerFiles;
     const std::string userFolderPath = playerFiles ? userFolder(project.settings) : std::string();

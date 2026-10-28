@@ -46,6 +46,9 @@ struct PlayOptions {
     bool record = false;    // 입력 기록 + 스냅샷: 일시정지, 한 틱 진행, 되감기 (에디터 혼자 플레이)
     std::string hashLogPath;      // 비어 있지 않으면 틱마다 "<틱> <상태 해시>" 한 줄 (--hash-log, 빌드·플랫폼 사이 비교)
     std::string recordInputsPath; // 비어 있지 않으면 확정된 입력과 해시를 파일로 (--record-inputs, game/InputRecord.h)
+    // 디싱크 덤프 폴더 (game/DesyncDump.h): 비어 있지 않으면 여러 명 매치에서 스냅샷을 몇 개 남겨 두고, 디싱크가 나면 갈라진 틱의 상태를 쓴다
+    std::string desyncDumpDir;
+    u32 desyncTestTick = 0; // 0이 아니면 이 틱을 실행하기 전에 물리를 조금 바꾼다 (--desync-test, 디싱크 진단 시험)
 };
 
 // 한 판: 결정론 시뮬레이션 실행, 로컬 입력, 카메라, 그리기.

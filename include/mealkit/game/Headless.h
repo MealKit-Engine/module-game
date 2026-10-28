@@ -8,6 +8,7 @@
 #include "mealkit/game/GameData.h"
 #include "mealkit/game/GameOptions.h"
 #include "mealkit/game/InputRecord.h"
+#include "mealkit/game/DesyncDump.h"
 #include "mealkit/game/ProjectSettings.h"
 #include "mealkit/game/Simulation.h"
 #include "mealkit/net/Lockstep.h"
@@ -153,6 +154,8 @@ int runHeadless(int argc, char** argv) {
     play.shadow = options.shadow;
     play.hashLogPath = options.hashLogPath;
     play.recordInputsPath = options.recordInputsPath;
+    play.desyncDumpDir = desyncDumpFolder(userFolder(data.project.settings));
+    play.desyncTestTick = options.desyncTestTick;
 
     Simulation<World> sim;
     const bool offline = options.mode == MatchOptions::Mode::Offline;

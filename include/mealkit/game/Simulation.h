@@ -4,6 +4,7 @@
 #include "mealkit/core/Log.h"
 #include "mealkit/core/Profile.h"
 #include "mealkit/core/Reflect.h"
+#include "mealkit/game/DesyncDump.h"
 #include "mealkit/game/GameInstance.h"
 #include "mealkit/game/InputRecord.h"
 #include "mealkit/game/SimDebug.h"
@@ -24,6 +25,8 @@
 //     다르면 멈추고 처음 갈라진 틱과 상태 필드 차이를 남긴다 (초기화 안 된 값, 전역 상태, 포인터 순서, 실제 시간 읽기를 잡는다)
 //   - 기록 (PlayOptions::record): 틱 입력과 해시, 주기적 스냅샷 → 일시정지, 한 틱 진행, 되감기
 //   - 해시 로그·입력 기록 파일 (PlayOptions::hashLogPath, recordInputsPath): 빌드·플랫폼 사이 비교 (game/InputRecord.h)
+//   - 디싱크 덤프 (PlayOptions::desyncDumpDir): 여러 명 매치에서 스냅샷을 kKeepDesyncSnapshots개 남기고, 세션이 디싱크를 알리면
+//     갈라진 틱 앞의 스냅샷에서 그 틱까지 다시 돌려 상태를 파일로 쓴다 (game/DesyncDump.h). 지금 상태는 그대로 둔다
 //
 // World 약속: state(MEALKIT_STRUCT, state.tick), physics, events, step(const net::TickInputs&), hash().
 // 매치를 시작할 때 reset(World&, 물리 스레드 수)으로 진짜·그림자 World를 똑같이 초기화한다.
@@ -38,6 +41,7 @@ public:
 
     static constexpr u32 kSnapshotInterval = 150; // 틱 (30Hz에서 5초)
     static constexpr u32 kKeepSnapshots = 40;     // 약 3분 20초를 되감을 수 있다
+    static constexpr u32 kKeepDesyncSnapshots = 3; // 디싱크 덤프용 (기록·되감기가 꺼진 여러 명 매치): 호스트가 알아채는 지연(256틱 안)을 덮는다
     static constexpr int kCatchUpTicks = 8;       // 한 프레임에 따라잡을 최대 틱
 
     template <class Reset>
@@ -63,6 +67,8 @@ public:
         m_paused = m_viewingPast = false;
         m_stepRequests = 0;
         m_replayError.clear();
+        m_history = options.record;
+        m_desyncDumped = false;
         clearHistory();
         m_recordWriter.close();
         m_hashLog.close();
@@ -138,6 +144,7 @@ public:
             // 입력을 기다리며 멈춘 동안 시간 빚이 무한히 쌓이지 않게 한다
             m_accumulator = std::min(m_accumulator, static_cast<f64>(m_tickDt) * kCatchUpTicks);
         }
+        if (session.desynced() && !m_desyncDumped && !m_options.desyncDumpDir.empty()) dumpDesync(session);
         m_simSeconds += nowSeconds() - simStart;
     }
 
@@ -226,8 +233,12 @@ private:
     template <class Sample, class OnTick>
     void executeTick(net::LockstepSession& session, Sample& sample, OnTick& onTick) {
         const net::TickInputs& inputs = session.inputs(m_nextTick);
+        if (m_nextTick == 0 && !m_history && !session.isOffline() && !m_options.desyncDumpDir.empty()) {
+            m_history = true; // 디싱크 덤프용 스냅샷 (매치 값과 여러 명인지는 세션이 Running이 된 뒤에 안다)
+            clearHistory();
+        }
         m_previous = m_world->state;
-        m_world->step(inputs);
+        stepWorld(*m_world, inputs, m_nextTick);
         const u64 hash = m_world->hash();
         session.tickExecuted(m_nextTick, hash);
         if (m_nextTick == 0 && !m_options.recordInputsPath.empty()) // 매치 값은 세션이 Running이 된 뒤에 확정된다
@@ -236,10 +247,10 @@ private:
         m_hashLog.write(m_nextTick, hash);
 
         if (m_shadow && !m_shadowStatus.desynced) {
-            m_shadow->step(inputs);
+            m_shadow->step(inputs); // --desync-test의 바꾸기는 진짜 World만 (그림자가 잡는다)
             if (m_shadow->hash() != hash) reportShadowDesync();
         }
-        if (m_options.record) record(inputs, hash);
+        if (m_history) record(inputs, hash);
         onTick(*m_world); // 틱 이벤트는 다음 step()에서 지워지므로 틱마다 바로 화면 쪽으로 옮긴다
 
         const net::PlayerInput local = sample(m_nextTick);
@@ -279,7 +290,7 @@ private:
     void takeSnapshot() {
         m_snapshots.emplace_back();
         saveSnapshot(*m_world, m_snapshots.back());
-        if (m_snapshots.size() > kKeepSnapshots) {
+        if (m_snapshots.size() > (m_options.record ? kKeepSnapshots : kKeepDesyncSnapshots)) {
             m_snapshots.pop_front();
             const u32 first = m_snapshots.front().tick; // 이보다 앞의 입력은 더 이상 쓸 일이 없다
             while (m_inputBase < first && !m_inputs.empty()) {
@@ -296,7 +307,46 @@ private:
         m_hashes.clear();
         m_inputBase = m_world ? m_world->state.tick : 0;
         m_live = {};
-        if (m_options.record && m_world) takeSnapshot();
+        if (m_history && m_world) takeSnapshot();
+    }
+
+    void stepWorld(World& world, const net::TickInputs& inputs, u32 tick) {
+        if (m_options.desyncTestTick && tick == m_options.desyncTestTick) world.physics.nudgeForTest();
+        world.step(inputs);
+    }
+
+    // 세션이 알린 디싱크 틱의 상태를 파일로 (한 번). 그 틱 앞의 스냅샷을 불러 그 틱까지 다시 돌린 뒤 지금 상태로 되돌린다
+    void dumpDesync(const net::LockstepSession& session) {
+        const u32 tick = session.desyncTick();
+        if (tick >= m_nextTick) return; // 아직 실행하지 않은 틱 (다음 프레임에)
+        m_desyncDumped = true;
+        DesyncDumpHeader h{session.localPlayer(), tick, session.seed(), session.contentHash(), {}};
+        std::vector<std::pair<u32, u64>> hashes;
+        for (u32 t = m_inputBase; t <= tick && t - m_inputBase < m_hashes.size(); ++t)
+            hashes.emplace_back(t, m_hashes[t - m_inputBase]);
+        const WorldSnapshot* from = nullptr;
+        for (const WorldSnapshot& s : m_snapshots)
+            if (s.tick <= tick) from = &s;
+        const std::string path = desyncDumpPath(m_options.desyncDumpDir, h.seed, tick, h.player);
+        if (!m_history || !from || tick < m_inputBase) { // 남은 기록이 그 틱을 덮지 못한다: 지금 상태를 쓴다
+            h.note = "no snapshot before the desync tick; this is the state at tick " + std::to_string(m_nextTick - 1);
+            writeDesyncDump(path, h, *m_world, hashes);
+            MEALKIT_ERROR("Desync dump (current state only): %s", path.c_str());
+            return;
+        }
+        returnToLive();
+        WorldSnapshot live;
+        saveSnapshot(*m_world, live);
+        const State previous = m_previous;
+        bool ok = loadSnapshot(*m_world, *from);
+        for (u32 t = from->tick; ok && t <= tick; ++t) stepWorld(*m_world, m_inputs[t - m_inputBase], t);
+        if (!ok) h.note = "the snapshot did not restore to its hash (undeclared state)";
+        else if (m_world->hash() != m_hashes[tick - m_inputBase])
+            h.note = "replaying from the snapshot did not reproduce this peer's hash (undeclared state)";
+        writeDesyncDump(path, h, *m_world, hashes);
+        if (!loadSnapshot(*m_world, live)) MEALKIT_ERROR("Desync dump: the live state did not restore to its hash");
+        m_previous = previous;
+        MEALKIT_ERROR("Desync dump written: %s (compare with tools\\desync_diff.ps1)", path.c_str());
     }
 
     void returnToLive() {
@@ -335,6 +385,8 @@ private:
     WorldSnapshot m_live; // 과거를 보는 동안 현재 상태
     State m_livePrevious;
 
+    bool m_history = false;      // 입력·해시·스냅샷을 남긴다 (PlayOptions::record, 또는 디싱크 덤프)
+    bool m_desyncDumped = false;
     InputRecordWriter m_recordWriter;
     HashLog m_hashLog;
 
