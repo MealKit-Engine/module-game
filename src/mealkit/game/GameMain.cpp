@@ -247,13 +247,15 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     }
 #endif
 
-    // 온라인 서비스(Steam): 빌드에 들어 있으면 시작할 때 로그인한다 (메뉴의 [Steam 방 만들기], 친구 초대 수락)
+    // 온라인 서비스(Steam·EOS): 빌드에 들어 있으면 시작할 때 로그인한다 (메뉴의 [Steam 방 만들기], 친구 초대 수락)
     const bool steamAsked = opt.mode == MatchOptions::Mode::SteamHost || opt.mode == MatchOptions::Mode::SteamJoin;
     online::Service online;
-    if (online::Service::backend() == online::Backend::Steam && !automated && run.onlineService) online.init();
+    if (online::Service::backend() != online::Backend::None && (!automated || steamAsked) && run.onlineService) online.init();
     if (steamAsked && !online.available())
-        MEALKIT_FATAL("Steam is not available. Run the Steam client, and build with the Steamworks SDK (see " MEALKIT_DOCS_URL
-                      "manual/multiplayer.html#steamworks).");
+        MEALKIT_FATAL("The online backend (%s) is not available. Steam: run the Steam client. EOS: check the internet "
+                      "connection. Without an SDK the build has no backend (see " MEALKIT_DOCS_URL
+                      "manual/multiplayer.html#steamworks).",
+                      online::Service::backendName());
 
     // 세션은 MatchService 안에 있다. 게임의 화면 흐름(메뉴)도 같은 함수로 방을 열고 들어간다
     MatchService matches;

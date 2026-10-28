@@ -115,7 +115,7 @@ void MatchService::returnToLobby() {
 
 void MatchService::leave() {
     if (m_online && m_config.online) { // 호스트가 나가면 로비 소유도 락스텝 승계자에게 (Steam이 다른 사람을 고르지 않게)
-        if (m_session.isHost()) m_config.online->setLobbyOwner(m_session.successorAddress().steamId);
+        if (m_session.isHost()) m_config.online->setLobbyOwner(m_session.successorAddress().userId);
         m_config.online->leaveLobby();
     }
     m_online = false;
@@ -186,8 +186,8 @@ void MatchService::update(f64 now) {
     m_session.update(now);
     if (m_session.state() == net::SessionState::Ended && m_error.empty()) m_error = m_session.endReason();
     // 호스트 이전 뒤: 플랫폼이 나를 로비 소유자로 골랐는데 락스텝 호스트가 다른 사람이면 그 사람에게 넘긴다
-    if (m_online && online && online->isLobbyOwner() && !m_session.isHost() && m_session.hostAddress().steamId)
-        online->setLobbyOwner(m_session.hostAddress().steamId);
+    if (m_online && online && online->isLobbyOwner() && !m_session.isHost() && m_session.hostAddress().userId)
+        online->setLobbyOwner(m_session.hostAddress().userId);
 
     // LAN 방 알림: IP로 연 방의 로비 동안
     if (m_announcer.isOpen()) {
@@ -228,7 +228,7 @@ void MatchService::update(f64 now) {
 
 void MatchService::shutdown() {
     if (m_online && m_config.online) {
-        if (m_session.isHost()) m_config.online->setLobbyOwner(m_session.successorAddress().steamId);
+        if (m_session.isHost()) m_config.online->setLobbyOwner(m_session.successorAddress().userId);
         m_config.online->leaveLobby();
     }
     m_online = false;
