@@ -53,6 +53,16 @@ private:
 
 bool loadInputRecording(const std::string& path, InputRecording& out, std::string& error);
 
+// 리플레이 (매치 기록): 게임 exe·에디터 플레이가 매치마다 <사용자 폴더>/replays/current.rec에 입력 기록을 쓰고,
+// 매치가 끝나면 keepReplay가 날짜·시각 이름으로 남긴다 (프로젝트 설정 keepReplays개, 오래된 것부터 지운다).
+// 튕겨서 남은 current.rec도 다음 실행 때 같은 식으로 남는다 (끝까지 읽은 틱만큼 재생된다).
+// 다시 보기: 게임 exe --replay <파일>, 에디터 [파일] > [리플레이 열기] (net::LockstepSession::startReplay)
+inline constexpr const char* kReplayFolder = "replays";
+std::string replayRecordingPath(const std::string& userFolder); // userFolder가 비어 있으면 빈 문자열 (기록하지 않는다)
+// current.rec를 replays/<YYYY-MM-DD_HH-MM>.rec로 옮기고 keep개만 남긴다. 남긴 경로 (기록이 없거나 틱이 없으면 빈 문자열)
+std::string keepReplay(const std::string& userFolder, u32 keep);
+std::vector<std::string> listReplays(const std::string& userFolder); // 남긴 리플레이 전체 경로, 새 것부터
+
 class HashLog {
 public:
     HashLog() = default;

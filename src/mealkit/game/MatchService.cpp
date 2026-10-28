@@ -1,6 +1,7 @@
 #include "mealkit/game/MatchService.h"
 
 #include "mealkit/core/Log.h"
+#include "mealkit/game/InputRecord.h"
 #include "mealkit/net/Socket.h"
 #include "mealkit/online/Online.h"
 #include "mealkit/platform/System.h"
@@ -48,6 +49,14 @@ bool MatchService::playOffline() {
     m_error.clear();
     m_online = false;
     return m_session.openOffline();
+}
+
+bool MatchService::playReplay(const InputRecording& recording) {
+    if (m_session.state() != net::SessionState::Idle) return false;
+    m_error.clear();
+    m_online = false;
+    return m_session.startReplay(recording.match.seed, recording.match.matchData, recording.match.loadouts,
+                                 recording.inputs, recording.hashes);
 }
 
 bool MatchService::host(u16 port, u32 maxPlayers) {
@@ -99,7 +108,10 @@ bool MatchService::start(u32 matchData) {
     return true;
 }
 
-void MatchService::returnToLobby() { m_session.returnToLobby(); }
+void MatchService::returnToLobby() {
+    if (m_session.isReplay()) leave(); // 리플레이에는 로비가 없다
+    else m_session.returnToLobby();
+}
 
 void MatchService::leave() {
     if (m_online && m_config.online) m_config.online->leaveLobby();

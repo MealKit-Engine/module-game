@@ -20,6 +20,8 @@ class Service;
 // 명령줄(--host, --join, --steam)은 엔진이 같은 함수로 미리 연다. 요청은 바로 처리하고, 실패하면 false와 error().
 namespace mealkit::game {
 
+struct InputRecording; // game/InputRecord.h
+
 enum class MatchPhase : u8 {
     Menu,       // 세션 없음 (타이틀·메인 메뉴)
     Opening,    // 온라인 로비를 만들거나 들어가는 중 (Steam)
@@ -75,6 +77,9 @@ public:
     bool hostOnline(u32 maxPlayers = 0);               // 온라인 친구 로비 (Steam). onlineAvailable일 때만
     bool join(const std::string& address);             // "주소[:포트]" (LAN 방 목록의 address도 이것)
     bool joinOnline(u64 lobbyId);
+    // 저장된 리플레이를 바로 매치로 (네트워크 없음, 내 입력은 버린다). 매치가 끝나 returnToLobby하면 메뉴로 (game/InputRecord.h)
+    bool playReplay(const InputRecording& recording);
+    bool isReplay() const { return m_session.isReplay(); }
     // 로비에서 (호스트). matchData는 게임이 정하는 매치 설정값
     bool start(u32 matchData = 0);
     // 매치 뒤 (호스트): 모두 로비로

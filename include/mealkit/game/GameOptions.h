@@ -32,7 +32,7 @@ struct MatchOptions {
     f32 netLagMs = 0.0f, netJitterMs = 0.0f, netLossPercent = 0.0f; // 네트워크 상태 흉내 (mealkit/net/Conditions.h)
     std::string scenePath, tuningPath;
     std::string hashLogPath, recordInputsPath;
-    std::string replayInputsPath; // 헤드리스 전용
+    std::string replayInputsPath; // 헤드리스 --replay-inputs (해시 비교), 창 --replay (보기)
 };
 using HeadlessOptions = MatchOptions; // 예전 이름 (게임 헤드리스 클래스의 defaults)
 

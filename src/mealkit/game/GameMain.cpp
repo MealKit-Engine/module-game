@@ -26,6 +26,7 @@
 #include "mealkit/game/Frontend.h"
 #include "mealkit/game/GameData.h"
 #include "mealkit/game/GameOptions.h"
+#include "mealkit/game/InputRecord.h"
 #include "mealkit/game/MatchService.h"
 #include "mealkit/game/ProjectSettings.h"
 #include "mealkit/game/RenderStyle.h"
@@ -290,9 +291,30 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     // 사용자 폴더(세이브·설정·바꾼 키): 자동 실행(--exit-tick)과 참가 창은 쓰지 않는다
     const bool playerFiles = !automated && run.playerFiles;
     const std::string userFolderPath = playerFiles ? userFolder(project.settings) : std::string();
+    // 리플레이 (game/InputRecord.h): 매치마다 사용자 폴더 replays/current.rec에 쓰고 매치가 끝나면 남긴다.
+    // --record-inputs를 주면 그 파일 하나에만, 리플레이를 보는 중에는 쓰지 않는다
+    const bool watching = !opt.replayInputsPath.empty();
+    const bool keepingReplays = gameOptions.recordInputsPath.empty() && !watching && !userFolderPath.empty() &&
+                                project.settings.keepReplays > 0;
+    if (keepingReplays) {
+        keepReplay(userFolderPath, project.settings.keepReplays); // 지난 실행이 매치 중에 끝나 남은 기록
+        gameOptions.recordInputsPath = replayRecordingPath(userFolderPath);
+    }
+    if (watching) gameOptions.recordInputsPath.clear();
 
     // 명령줄로 정한 시작: 방 만들기·참가는 로비부터. 혼자 플레이는 메뉴가 있는 게임이면 메뉴부터(자동 실행·봇은 바로 매치)
-    switch (opt.mode) {
+    if (watching) {
+        InputRecording recording;
+        std::string error;
+        if (!loadInputRecording(opt.replayInputsPath, recording, error) || recording.inputs.empty())
+            MEALKIT_FATAL("Cannot play the replay %s: %s", opt.replayInputsPath.c_str(),
+                          error.empty() ? "it has no ticks" : error.c_str());
+        if (recording.contentHash != data.contentHash) // 보기는 하되, 갈라지면 그 틱에서 멈춘다
+            MEALKIT_WARN("Replay %s was recorded with different game data (content hash %016llx, now %016llx)",
+                         opt.replayInputsPath.c_str(), static_cast<unsigned long long>(recording.contentHash),
+                         static_cast<unsigned long long>(data.contentHash));
+        matches.playReplay(recording);
+    } else switch (opt.mode) {
     case MatchOptions::Mode::Offline:
         if (!menus || opt.exitTick > 0 || win.bot) { // 자동 시험(--exit-tick)·봇은 메뉴 없이 바로 매치
             matches.playOffline();
@@ -366,6 +388,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     f64 exitDeadline = 0.0;  // --exit-tick 도달 후 종료 시각
     bool loadingShown = false; // 세션이 Running이 된 뒤 로딩 화면을 한 번 그렸다 (그다음 프레임에 start)
     u32 frameCount = 0;        // --frames
+    bool replayStopped = false; // 리플레이가 갈라져 멈췄다
 
     while (window.pumpMessages()) {
         const f64 now = nowSeconds();
@@ -417,6 +440,12 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         } else if (game->started() && session.state() != net::SessionState::Running) {
             game->stop(ctx); // 로비로 돌아감, 나감, 끊김
             loadingShown = false;
+            if (keepingReplays) keepReplay(userFolderPath, project.settings.keepReplays);
+        }
+        // 리플레이가 기록과 갈라지면 (다른 빌드·데이터) 그 틱에서 멈춘다
+        if (session.isReplay() && session.desynced() && !replayStopped && game->debug()) {
+            game->debug()->setPaused(true);
+            replayStopped = true;
         }
 
         ctx.viewport = {0.0f, 0.0f, static_cast<f32>(window.width()), static_cast<f32>(window.height())};
@@ -510,6 +539,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     }
 
     if (game->started()) game->stop(ctx);
+    if (keepingReplays) keepReplay(userFolderPath, project.settings.keepReplays); // 매치 중에 창을 닫았다
     module.destroy(game);
     matches.shutdown();
     audio.shutdown();

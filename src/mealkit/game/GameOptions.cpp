@@ -103,6 +103,7 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
         else if (a == "--hash-log" && next(v)) o.hashLogPath = v;
         else if (a == "--record-inputs" && next(v)) o.recordInputsPath = v;
         else if (a == "--replay-inputs" && headless && next(v)) o.replayInputsPath = v;
+        else if (a == "--replay" && !headless && next(v)) o.replayInputsPath = v;
         else if (a == "--any-build") o.anyBuild = true;
         else if (a == "--net-lag" && next(v)) o.netLagMs = static_cast<f32>(std::atof(v));
         else if (a == "--net-jitter" && next(v)) o.netJitterMs = static_cast<f32>(std::atof(v));

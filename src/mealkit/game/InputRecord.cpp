@@ -4,6 +4,7 @@
 #include "mealkit/platform/Paths.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 
 namespace mealkit::game {
@@ -11,6 +12,7 @@ namespace {
 
 constexpr char kMagic[8] = {'M', 'K', 'I', 'N', 'P', 'U', 'T', '1'};
 constexpr u32 kVersion = 3; // 2: 틱마다 확정 명령, 3: 머리에 로드아웃
+constexpr size_t kStampLength = 16; // 리플레이 이름의 날짜·시각 "YYYY-MM-DD_HH-MM"
 constexpr size_t kHeaderBytes = 8 + 4 + 4 + 8 + 4 + 4 + 8;
 
 // 어느 CPU에서 써도 같은 바이트가 되도록 직접 리틀 엔디언으로 쓴다
@@ -29,6 +31,7 @@ u64 get(const u8*& p, int bytes) {
 bool InputRecordWriter::open(const std::string& path, const MatchInfo& match, u64 contentHash) {
     close();
     if (match.playerCount == 0 || match.playerCount > net::kMaxPlayers) return false;
+    if (!parentDirectory(path).empty()) createDirectories(parentDirectory(path));
     m_file = openFile(path, "wb");
     if (!m_file) {
         MEALKIT_ERROR("Cannot write the input record %s", path.c_str());
@@ -141,6 +144,54 @@ MatchInfo matchInfo(const net::LockstepSession& session) {
     MatchInfo m{session.seed(), session.playerCount(), session.matchData(), {}};
     for (u32 i = 0; i < m.playerCount; ++i) m.loadouts.push_back(session.loadout(i));
     return m;
+}
+
+std::string replayRecordingPath(const std::string& userFolder) {
+    return userFolder.empty() ? std::string() : userFolder + "/" + kReplayFolder + "/current.rec";
+}
+
+std::vector<std::string> listReplays(const std::string& userFolder) {
+    std::vector<std::string> out;
+    if (userFolder.empty()) return out;
+    const std::string folder = userFolder + "/" + kReplayFolder;
+    for (const std::string& name : listFiles(folder, ".rec"))
+        if (name != "current.rec") out.push_back(folder + "/" + name);
+    // 이름 "YYYY-MM-DD_HH-MM[-n].rec": 같은 분에 남긴 것은 -2, -3이 붙어 이름 순이 시간 순과 다르다. (날짜·시각, n) 순으로
+    const auto key = [](const std::string& path) {
+        const std::string name = fileName(path);
+        const u32 n = name.size() > kStampLength + 1 && name[kStampLength] == '-'
+                          ? static_cast<u32>(std::atoi(name.c_str() + kStampLength + 1))
+                          : 1u;
+        return std::make_pair(name.substr(0, kStampLength), n);
+    };
+    std::sort(out.begin(), out.end(), [&](const std::string& a, const std::string& b) { return key(a) > key(b); });
+    return out;
+}
+
+std::string keepReplay(const std::string& userFolder, u32 keep) {
+    const std::string current = replayRecordingPath(userFolder);
+    if (current.empty() || !fileExists(current)) return {};
+    InputRecording rec;
+    std::string error;
+    if (keep == 0 || !loadInputRecording(current, rec, error) || rec.inputs.empty()) {
+        removeFile(current);
+        return {};
+    }
+    std::string stamp = formatFileTime(fileWriteTime(current), true); // "2026-10-18 14:05"
+    for (char& c : stamp)
+        if (c == ' ') c = '_';
+        else if (c == ':') c = '-';
+    const std::string folder = parentDirectory(current);
+    std::string path = folder + "/" + stamp + ".rec";
+    for (u32 n = 2; fileExists(path); ++n) path = folder + "/" + stamp + "-" + std::to_string(n) + ".rec";
+    if (!moveFile(current, path)) {
+        MEALKIT_ERROR("Cannot keep the replay %s", path.c_str());
+        return {};
+    }
+    const std::vector<std::string> all = listReplays(userFolder);
+    for (size_t i = keep; i < all.size(); ++i) removeFile(all[i]);
+    MEALKIT_INFO("Replay saved: %s (%zu tick(s))", path.c_str(), rec.inputs.size());
+    return path;
 }
 
 bool HashLog::open(const std::string& path) {
