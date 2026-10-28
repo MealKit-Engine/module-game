@@ -3,6 +3,7 @@
 #include "mealkit/asset/Budget.h"
 #include "mealkit/core/Reflect.h"
 #include "mealkit/net/Lockstep.h"
+#include "mealkit/platform/Paths.h"
 
 #include <algorithm>
 
@@ -134,7 +135,7 @@ inline void modelBudgets(const ProjectSettings& s, asset::ModelBudget (&out)[ass
 }
 
 // 시작 씬의 findAsset 경로 ("assets/scenes/arena.scene")
-inline std::string startSceneAsset(const ProjectSettings& settings) { return "assets/" + settings.scene; }
+inline std::string startSceneAsset(const ProjectSettings& settings) { return assetFilePath(settings.scene); }
 // 플레이어별 파일 폴더 (바꾼 키, 설정, 세이브): 사용자 앱 데이터 폴더/<게임 이름>. 콘텐츠 해시와 무관하다.
 std::string userFolder(const ProjectSettings& settings);
 

@@ -16,7 +16,7 @@ bool applyRenderStyle(const ProjectSettings& settings, render::Renderer& rendere
     const f32 gpuBudgetMs = settings.gpuBudgetOpaqueMs + settings.gpuBudgetShadowMs + settings.gpuBudgetPostMs + settings.gpuBudgetVfxMs +
                             settings.gpuBudgetUiMs + settings.gpuBudgetSpareMs;
     renderer.setDynamicResolution(settings.dynamicResolution, settings.dynamicResolutionMinScale, gpuBudgetMs, settings.upscaleSharpness);
-    const std::string rampFile = settings.toonRamp.empty() ? std::string() : findAsset("assets/" + settings.toonRamp);
+    const std::string rampFile = settings.toonRamp.empty() ? std::string() : findAssetFile(settings.toonRamp);
     const unsigned long long rampTime = rampFile.empty() ? 0 : fileWriteTime(rampFile);
     if (state.applied && state.lightingModel == settings.lightingModel && state.toonRamp == settings.toonRamp &&
         state.rampTime == rampTime)
