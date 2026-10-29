@@ -39,7 +39,7 @@ bool MatchService::fail(const std::string& message) {
 }
 
 u64 MatchService::nextSeed() {
-    const u64 index = m_session.matchIndex(); // 이번에 시작할 매치 앞까지의 수
+    const u64 index = m_session.matchIndex(); // count up to just before the match starting now
     if (m_config.seed) return m_config.seed + index;
     return (static_cast<u64>(std::time(nullptr)) << 8) ^ index;
 }
@@ -67,7 +67,7 @@ bool MatchService::host(u16 port, u32 maxPlayers) {
     m_maxPlayers = maxPlayers ? maxPlayers : m_config.defaultMaxPlayers;
     if (!m_session.host(m_port, m_maxPlayers, m_config.inputDelay, m_config.loopbackOnly))
         return fail("Could not host on port " + std::to_string(m_port) + " (is another game using it?)");
-    if (m_config.announceRooms) m_announcer.open(!m_config.loopbackOnly); // --local이면 같은 PC에만
+    if (m_config.announceRooms) m_announcer.open(!m_config.loopbackOnly); // with --local, same PC only
     return true;
 }
 
@@ -77,7 +77,7 @@ bool MatchService::hostOnline(u32 maxPlayers) {
     m_online = true;
     m_onlineHost = true;
     m_maxPlayers = maxPlayers ? maxPlayers : m_config.defaultMaxPlayers;
-    m_config.online->createLobby(m_maxPlayers); // 준비되면 update가 세션을 연다
+    m_config.online->createLobby(m_maxPlayers); // when ready, update opens the session
     return true;
 }
 
@@ -109,12 +109,12 @@ bool MatchService::start(u32 matchData) {
 }
 
 void MatchService::returnToLobby() {
-    if (m_session.isReplay()) leave(); // 리플레이에는 로비가 없다
+    if (m_session.isReplay()) leave(); // replays have no lobby
     else m_session.returnToLobby();
 }
 
 void MatchService::leave() {
-    if (m_online && m_config.online) { // 호스트가 나가면 로비 소유도 락스텝 승계자에게 (Steam이 다른 사람을 고르지 않게)
+    if (m_online && m_config.online) { // when the host leaves, lobby ownership also goes to the lockstep successor (so Steam doesn't pick someone else)
         if (m_session.isHost()) m_config.online->setLobbyOwner(m_session.successorAddress().userId);
         m_config.online->leaveLobby();
     }
@@ -168,7 +168,7 @@ void MatchService::update(f64 now) {
         if (m_online && m_session.state() == net::SessionState::Idle) {
             if (online->lobbyState() == online::LobbyState::Failed) {
                 fail("The online lobby failed (see log)");
-            } else if (online->lobbyState() == online::LobbyState::InLobby) { // 방장 주소로 락스텝 세션 (플랫폼 릴레이)
+            } else if (online->lobbyState() == online::LobbyState::InLobby) { // lockstep session to the host's address (platform relay)
                 if (online->isLobbyOwner()) {
                     m_session.hostWith(online->createTransport(), m_maxPlayers, m_config.inputDelay);
                     online->inviteFriends();
@@ -177,7 +177,7 @@ void MatchService::update(f64 now) {
                 }
             }
         }
-        if (const u64 invited = online->takeJoinRequest()) { // 친구 초대 수락: 메뉴에 있으면 바로 들어간다
+        if (const u64 invited = online->takeJoinRequest()) { // accepted friend invite: join right away if at the menu
             if (phase() == MatchPhase::Menu) joinOnline(invited);
             else MEALKIT_INFO("Invite to lobby %llu received - leave the current match to join", static_cast<unsigned long long>(invited));
         }
@@ -185,11 +185,11 @@ void MatchService::update(f64 now) {
 
     m_session.update(now);
     if (m_session.state() == net::SessionState::Ended && m_error.empty()) m_error = m_session.endReason();
-    // 호스트 이전 뒤: 플랫폼이 나를 로비 소유자로 골랐는데 락스텝 호스트가 다른 사람이면 그 사람에게 넘긴다
+    // After host migration: if the platform chose me as lobby owner but the lockstep host is someone else, hand it to them
     if (m_online && online && online->isLobbyOwner() && !m_session.isHost() && m_session.hostAddress().userId)
         online->setLobbyOwner(m_session.hostAddress().userId);
 
-    // LAN 방 알림: IP로 연 방의 로비 동안
+    // LAN room announcements: during the lobby of a room opened by IP
     if (m_announcer.isOpen()) {
         if (m_session.isHost() && m_session.state() == net::SessionState::Lobby) {
             net::RoomAnnouncement room;

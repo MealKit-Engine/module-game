@@ -1,13 +1,13 @@
-// 출시 exe의 main (mealkit/game/GameMain.h). 게임의 app/main.cpp가 MEALKIT_GAME_MAIN으로 부른다.
+// main of the shipping exe (mealkit/game/GameMain.h). The game's app/main.cpp calls it via MEALKIT_GAME_MAIN.
 //
-//   <게임>.exe                         메뉴가 있는 게임은 타이틀부터 (GameInstance::menus), 없으면 혼자 플레이
-//   <게임>.exe --host [port]           방 만들기 (로비부터. 메뉴가 없는 게임은 Enter로 시작)
-//   <게임>.exe --join 127.0.0.1[:port] 참가
-//   <게임>.exe --scene my.scene        다른 씬으로 플레이 (모든 플레이어가 같은 파일이어야 한다)
-//   <게임>.exe --headless ...          창 없이 시뮬레이션만 (게임의 app/Headless.cpp, <게임>_headless.exe와 같다)
+//   <game>.exe                         games with menus start at the title (GameInstance::menus), otherwise solo play
+//   <game>.exe --host [port]           create a room (starts at the lobby. Games without menus start with Enter)
+//   <game>.exe --join 127.0.0.1[:port] join
+//   <game>.exe --scene my.scene        play a different scene (all players must have the same file)
+//   <game>.exe --headless ...          simulation only without a window (the game's app/Headless.cpp, same as <game>_headless.exe)
 //
-// 시작 씬은 mealkit.project, 기본 포트·인원은 게임 헤드리스 클래스의 defaults()(보통 mealkit.project의 game.* 항목)에서 읽는다.
-// 엔진 키: V 수직동기, F12 스크린샷, F1 디버그 UI(개발 빌드), Esc 종료(메뉴가 없는 게임만), I 친구 초대(온라인 로비)
+// The start scene comes from mealkit.project; default port/player count from the game headless class's defaults() (usually game.* items in mealkit.project).
+// Engine keys: V vsync, F12 screenshot, F1 debug UI (dev builds), Esc quit (games without menus only), I invite friends (online lobby)
 
 #include "mealkit/game/GameMain.h"
 
@@ -62,7 +62,7 @@
 namespace mealkit::game {
 namespace {
 
-// 최소 사양 실기 측정 결과를 CHANGELOG에 옮겨 적기 쉬운 모양으로 출력한다.
+// Prints min-spec hardware measurement results in a shape that's easy to copy into the CHANGELOG.
 int printSystemInfo() {
     std::printf("CPU: %s\n", cpuName().c_str());
     render::GpuInfo gpu;
@@ -91,7 +91,7 @@ int printSystemInfo() {
     return below.empty() ? 0 : 2;
 }
 
-// --benchmark가 끝났을 때: 보고서 파일과 자동 시험이 읽는 BENCHMARK 줄
+// When --benchmark finishes: the report file and the BENCHMARK line read by automated tests
 bool writeBenchmark(const Benchmark& bench, const ProjectSettings& project, const GameMainSpec& spec,
                     const render::Renderer& renderer, const MatchOptions& match, const std::string& path) {
     BenchmarkInfo info;
@@ -126,7 +126,7 @@ bool writeBenchmark(const Benchmark& bench, const ProjectSettings& project, cons
     return true;
 }
 
-// --exit-tick에 닿았을 때: 자동 시험이 읽는 줄(FINAL, SHADOW, REWIND)을 쓰고 종료 코드를 돌려준다
+// When --exit-tick is reached: writes the lines read by automated tests (FINAL, SHADOW, REWIND) and returns the exit code
 int reportFinish(GameInstance& game, const net::LockstepSession& session, const MatchOptions& match,
                  const WindowOptions& win) {
     std::printf("FINAL tick=%u hash=%016llx desync=%d\n", game.nextTick() - 1,
@@ -138,7 +138,7 @@ int reportFinish(GameInstance& game, const net::LockstepSession& session, const 
             std::printf("SHADOW %s tick=%u\n", shadow.desynced ? "DESYNC" : "ok", shadow.tick);
             if (shadow.desynced) exitCode = 5;
         }
-        if (win.rewindTest) { // 기록 범위 전체를 조금씩 되감아 다시 돌리고, 현재로 돌아와 해시가 같은지 본다
+        if (win.rewindTest) { // rewinds the whole recorded range bit by bit, reruns, returns to the present, and checks the hashes match
             const u64 liveHash = game.stateHash();
             debug->setPaused(true);
             const Timeline t = debug->timeline();
@@ -154,7 +154,7 @@ int reportFinish(GameInstance& game, const net::LockstepSession& session, const 
     return exitCode;
 }
 
-// 매치가 진행 중이 아닐 때 창 제목에 쓰는 상태 (게임 문자열 표의 title.* 키). 진행 중이거나 메뉴면 빈 문자열
+// Status written in the window title when no match is in progress (title.* keys in the game string table). Empty string if in progress or in a menu
 std::string lobbyStatus(const MatchService& match, const loc::Strings& strings) {
     const net::LockstepSession& session = match.session();
     const auto num = [](u32 v) { return std::to_string(v); };
@@ -185,7 +185,7 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
         return 1;
     }
     if (win.systemInfo) return printSystemInfo();
-    if (win.benchmarkSeconds > 0.0) { // 벤치마크: 매번 같은 매치 (고정 시드 + 봇), 화면 동기 없이, 소리 없이
+    if (win.benchmarkSeconds > 0.0) { // benchmark: the same match every time (fixed seed + bots), no display sync, no sound
         if (opt.mode != MatchOptions::Mode::Offline) {
             std::printf("--benchmark runs offline only (no --host/--join)\n");
             return 1;
@@ -204,7 +204,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     const bool automated = opt.exitTick > 0 || win.frames > 0 || benchmark;
     if (automated) log::setDialogs(false);
 
-    MEALKIT_INFO("CPU: %s", cpuName().c_str()); // 다른 PC 결정론 기록용
+    MEALKIT_INFO("CPU: %s", cpuName().c_str()); // for recording determinism on other PCs
     MEALKIT_INFO("Build: version %s, commit %s, simulation %016llx, %s", spec.build.gameVersion, spec.build.commit,
                  static_cast<unsigned long long>(spec.build.simVersion), net::determinismGroup());
     Window window;
@@ -217,8 +217,8 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     asset::ModelCache models;
     models.setRenderer(&renderer);
 
-    // 매치 데이터 (헤드리스·에디터 플레이와 같은 함수): 프로젝트 설정(출시본은 exe 옆, 개발 중에는 프로젝트 폴더의 mealkit.project),
-    // 씬, 튜닝, 콘텐츠 해시. 실행 파일 + 이 해시가 같아야 접속할 수 있다
+    // Match data (same function as headless/editor play): project settings (next to the exe for shipping, the project folder's mealkit.project during development),
+    // scene, tuning, content hash. The executable + this hash must match to connect
     MatchData data;
     MatchDataOptions dataOptions;
     dataOptions.scenePath = opt.scenePath;
@@ -228,13 +228,13 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         MEALKIT_FATAL("Cannot load the match data (see log)");
     const ProjectFile& project = data.project;
     RenderStyleState renderStyle;
-    applyRenderStyle(project.settings, renderer, renderStyle); // 조명 모델·툰 램프 (파이프라인은 renderer.init이 이미 만들었다)
-    if (spec.defaults && data.gameProject.data()) spec.defaults(opt, data.gameProject.data()); // 헤드리스와 같은 기본값 (포트·인원)
-    opt.inputDelay = msToTicks(opt.inputDelayMs); // 틱레이트(프로젝트 설정)를 안 뒤
+    applyRenderStyle(project.settings, renderer, renderStyle); // lighting model/toon ramp (renderer.init already built the pipelines)
+    if (spec.defaults && data.gameProject.data()) spec.defaults(opt, data.gameProject.data()); // same defaults as headless (port/player count)
+    opt.inputDelay = msToTicks(opt.inputDelayMs); // after the tick rate (project setting) is known
     const scene::Scene& scene = data.scene;
 
 #if MEALKIT_LIVE
-    // 라이브 연결 (도구 사이 약속, mealkit/live/Server.h): 개발 빌드만. 접속 정보는 프로젝트의 build/live/game-<pid>.json
+    // Live connection (contract between tools, mealkit/live/Server.h): dev builds only. Connection info is in the project's build/live/game-<pid>.json
     live::Server liveServer;
     {
         live::ServerConfig c;
@@ -243,11 +243,11 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         c.projectDir = projectFile.empty() ? std::string() : parentDirectory(projectFile);
         c.projectName = project.settings.name.empty() ? module.name : project.settings.name;
         liveServer.start(c);
-        liveServer.addTopic("stats"); // game::FrameStats::json, 보고 주기마다
+        liveServer.addTopic("stats"); // game::FrameStats::json, every report period
     }
 #endif
 
-    // 온라인 서비스(Steam·EOS): 빌드에 들어 있으면 시작할 때 로그인한다 (메뉴의 [Steam 방 만들기], 친구 초대 수락)
+    // Online services (Steam/EOS): if included in the build, logs in at startup (menu [Create Steam Room], accepting friend invites)
     const bool steamAsked = opt.mode == MatchOptions::Mode::SteamHost || opt.mode == MatchOptions::Mode::SteamJoin;
     online::Service online;
     if (online::Service::backend() != online::Backend::None && (!automated || steamAsked) && run.onlineService) online.init();
@@ -257,7 +257,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
                       "manual/multiplayer.html#steamworks).",
                       online::Service::backendName());
 
-    // 세션은 MatchService 안에 있다. 게임의 화면 흐름(메뉴)도 같은 함수로 방을 열고 들어간다
+    // The session lives inside MatchService. The game's screen flow (menus) opens and joins rooms with the same functions
     MatchService matches;
     {
         MatchServiceConfig c;
@@ -274,7 +274,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         c.build = spec.build;
         std::copy(std::begin(data.contentParts), std::end(data.contentParts), std::begin(c.contentParts));
         c.autoDelay = autoDelayOf(project.settings, 1000.0f / static_cast<f32>(reflect::tickRate()));
-        c.autoDelay.enabled = c.autoDelay.enabled && !opt.delayGiven; // --delay: 고정
+        c.autoDelay.enabled = c.autoDelay.enabled && !opt.delayGiven; // --delay: fixed
         c.online = online.available() ? &online : nullptr;
         matches.init(c);
     }
@@ -285,7 +285,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     PlayOptions gameOptions;
     gameOptions.bot = win.bot;
     gameOptions.exitTick = opt.exitTick;
-    gameOptions.capture = !win.capturePath.empty() && (win.captureTick > 0 || win.frames == 0); // 틱이 없으면 --frames의 마지막 프레임
+    gameOptions.capture = !win.capturePath.empty() && (win.captureTick > 0 || win.frames == 0); // without a tick, the last frame of --frames
     gameOptions.captureTick = win.captureTick;
     gameOptions.physicsThreads = opt.physicsThreads;
     gameOptions.tuningPath = opt.tuningPath;
@@ -295,37 +295,37 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     gameOptions.recordInputsPath = opt.recordInputsPath;
     gameOptions.desyncDumpDir = desyncDumpFolder(userFolder(project.settings));
     gameOptions.desyncTestTick = opt.desyncTestTick;
-    // 사용자 폴더(세이브·설정·바꾼 키): 자동 실행(--exit-tick)과 참가 창은 쓰지 않는다
+    // User folder (saves/settings/rebound keys): not used by automated runs (--exit-tick) and join windows
     const bool playerFiles = !automated && run.playerFiles;
     const std::string userFolderPath = playerFiles ? userFolder(project.settings) : std::string();
-    // 리플레이 (game/InputRecord.h): 매치마다 사용자 폴더 replays/current.rec에 쓰고 매치가 끝나면 남긴다.
-    // --record-inputs를 주면 그 파일 하나에만, 리플레이를 보는 중에는 쓰지 않는다
+    // Replays (game/InputRecord.h): each match writes to replays/current.rec in the user folder and keeps it when the match ends.
+    // With --record-inputs, only to that one file; nothing is written while watching a replay
     const bool watching = !opt.replayInputsPath.empty();
     const bool keepingReplays = gameOptions.recordInputsPath.empty() && !watching && !userFolderPath.empty() &&
                                 project.settings.keepReplays > 0;
     if (keepingReplays) {
-        keepReplay(userFolderPath, project.settings.keepReplays); // 지난 실행이 매치 중에 끝나 남은 기록
+        keepReplay(userFolderPath, project.settings.keepReplays); // recording left over from a previous run that ended mid-match
         gameOptions.recordInputsPath = replayRecordingPath(userFolderPath);
     }
     if (watching) gameOptions.recordInputsPath.clear();
 
-    // 명령줄로 정한 시작: 방 만들기·참가는 로비부터. 혼자 플레이는 메뉴가 있는 게임이면 메뉴부터(자동 실행·봇은 바로 매치)
+    // Start decided by the command line: create/join a room starts at the lobby. Solo play starts at the menu for games with menus (automated runs/bots go straight to the match)
     if (watching) {
         InputRecording recording;
         std::string error;
         if (!loadInputRecording(opt.replayInputsPath, recording, error) || recording.inputs.empty())
             MEALKIT_FATAL("Cannot play the replay %s: %s", opt.replayInputsPath.c_str(),
                           error.empty() ? "it has no ticks" : error.c_str());
-        if (recording.contentHash != data.contentHash) // 보기는 하되, 갈라지면 그 틱에서 멈춘다
+        if (recording.contentHash != data.contentHash) // still watch, but pause at the tick where it diverges
             MEALKIT_WARN("Replay %s was recorded with different game data (content hash %016llx, now %016llx)",
                          opt.replayInputsPath.c_str(), static_cast<unsigned long long>(recording.contentHash),
                          static_cast<unsigned long long>(data.contentHash));
         matches.playReplay(recording);
     } else switch (opt.mode) {
     case MatchOptions::Mode::Offline:
-        if (!menus || opt.exitTick > 0 || win.bot) { // 자동 시험(--exit-tick)·봇은 메뉴 없이 바로 매치
+        if (!menus || opt.exitTick > 0 || win.bot) { // automated tests (--exit-tick)/bots go straight to the match without menus
             matches.playOffline();
-            game->lobby(session, gameOptions, userFolderPath); // 매치 시작 데이터 (로드아웃)
+            game->lobby(session, gameOptions, userFolderPath); // match start data (loadout)
             matches.start(opt.matchData);
         }
         break;
@@ -342,16 +342,16 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     FrameLimiter limiter;
     limiter.setTargetFps(win.vsync ? 0.0 : win.fpsCap);
 
-    // 소리: 기본 출력 장치 (없으면 소리 없이 돈다). 창이 포커스를 잃으면 음소거 (플레이어 설정에서 끌 수 있다)
+    // Sound: default output device (runs without sound if none). Muted when the window loses focus (can be turned off in player settings)
     audio::Engine audio;
     audio.init({project.settings.audioVoices, win.mute});
 #if MEALKIT_LIVE
-    audio::addLiveService(liveServer, [&audio] { return &audio; }); // MealKit Audio: 게임에서 재생, 다시 읽기, 상태
+    audio::addLiveService(liveServer, [&audio] { return &audio; }); // MealKit Audio: playback in the game, reload, status
 #endif
-    feedback::Player feedback(audio); // assets/feedback.table: 틱 이벤트 → 소리·흔들림·번쩍임·화면 정지
+    feedback::Player feedback(audio); // assets/feedback.table: tick events → sound/shake/flash/hitstop
 
-    // 화면 쪽 서비스: 입력 액션(assets/input.bindings + 플레이어가 바꾼 키), 문자열 표, 게임 UI, 플레이어 설정, 화면용 튜닝.
-    // 자동 실행(--exit-tick)은 설정 기본값으로 돌고 저장하지 않는다 (이 PC의 설정이 시험 결과를 바꾸지 않게, 창 크기는 명령줄)
+    // View-side services: input actions (assets/input.bindings + keys rebound by the player), string tables, game UI, player settings, view tuning.
+    // Automated runs (--exit-tick) use default settings and don't save (so this PC's settings don't change test results; window size from the command line)
     Frontend front;
     {
         FrontendConfig c;
@@ -365,12 +365,12 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         c.projectLanguage = project.settings.language;
         c.bindingsUserFile = run.playerFiles ? userFolder(project.settings) + "/" + input::kBindingsTable : std::string();
         c.settingsFile = playerFiles ? userFolderPath + "/" + settings::kSettingsFile : std::string();
-        c.viewTuningType = module.viewTuningType ? module.viewTuningType() : nullptr; // 파일이 바뀌면 다시 읽는다
+        c.viewTuningType = module.viewTuningType ? module.viewTuningType() : nullptr; // reread when the file changes
         c.viewTuningPath = run.viewTuningPath;
         front.init(c);
         if (win.openSettings) front.settings().open();
     }
-    // 동적 해상도: 자동 실행(시험·벤치마크)은 GPU 속도에 그림이 달라지지 않게 끈다. --render-scale은 배율 고정
+    // Dynamic resolution: off for automated runs (tests/benchmarks) so images don't vary with GPU speed. --render-scale fixes the scale
     if (automated || win.renderScale > 0.0f) {
         const render::ResolutionSettings& r = renderer.resolution();
         renderer.setDynamicResolution(false, r.minScale, r.budgetMs, r.sharpness);
@@ -378,25 +378,25 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     }
 
     GameContext ctx = front.context(window, renderer, models, matches);
-    ctx.userFolder = userFolderPath; // 세이브 (자동 실행은 저장하지 않는다)
+    ctx.userFolder = userFolderPath; // saves (automated runs don't save)
     ctx.scene = &scene;
 #if MEALKIT_DEBUG_UI
-    // 디버그 UI (F1): 개발 빌드만 (출시 빌드 build.bat Export에는 ImGui가 없다). 처음 켤 때 만든다 (글꼴 읽기)
+    // Debug UI (F1): dev builds only (shipping build.bat Export has no ImGui). Created when first turned on (reads fonts)
     debug::ImGuiLayer debugUi;
     bool debugUiReady = false, debugUiShown = false;
     std::string perfText;
 #endif
     render::DrawList drawList;
     f64 lastTime = nowSeconds();
-    FrameStats perf; // 성능 숫자 (창 제목·F1·perf 로그, mealkit/game/FrameStats.h)
-    Benchmark bench({win.benchmarkSeconds}); // --benchmark (perf의 묶음을 쌓는다)
+    FrameStats perf; // performance numbers (window title/F1/perf log, mealkit/game/FrameStats.h)
+    Benchmark bench({win.benchmarkSeconds}); // --benchmark (accumulates perf batches)
     u32 perfLogCounter = 0;
     int exitCode = 0;
-    f64 exitDeadline = 0.0;  // --exit-tick 도달 후 종료 시각
-    bool loadingShown = false; // 세션이 Running이 된 뒤 로딩 화면을 한 번 그렸다 (그다음 프레임에 start)
+    f64 exitDeadline = 0.0;  // exit time after reaching --exit-tick
+    bool loadingShown = false; // the loading screen was drawn once after the session became Running (start on the next frame)
     u32 frameCount = 0;        // --frames
-    bool replayStopped = false; // 리플레이가 갈라져 멈췄다
-    // 버그 리포트 (F9, game/BugReport.h): 개발 빌드는 한 줄을 적는 창 → 스크린샷 요청 → 다음 프레임에 묶는다 (endFrame이 PNG를 쓴 뒤)
+    bool replayStopped = false; // the replay diverged and paused
+    // Bug report (F9, game/BugReport.h): in dev builds, a one-line note window → screenshot request → bundle on the next frame (after endFrame writes the PNG)
     enum class BugStep { None, Note, Shot, Write };
     BugStep bugStep = BugStep::None;
     char bugNote[256] = {};
@@ -410,11 +410,11 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         Input& input = window.input();
         if (exitDeadline > 0.0 && now >= exitDeadline) break;
 
-        // Esc: 메뉴가 있는 게임은 게임이 쓴다 (일시정지·뒤로). 없는 게임은 끝낸다 (설정 화면이 열려 있으면 화면을 닫는다)
+        // Esc: games with menus use it themselves (pause/back). Games without menus quit (if the settings screen is open, it closes the screen)
         if (!menus && input.keyPressed(key::Escape) && !front.settings().isOpen() && bugStep == BugStep::None) break;
         if (input.keyPressed('V') && !front.ui().editingText()) renderer.setVsync(!renderer.vsync());
         if (input.keyPressed(key::F12)) renderer.requestCapture("screenshot.png");
-        if (input.keyPressed(key::F11)) rhi::captureNextGpuFrame(); // --gpu-capture (도구가 없으면 아무것도 안 한다)
+        if (input.keyPressed(key::F11)) rhi::captureNextGpuFrame(); // --gpu-capture (does nothing without the tool)
         if (bugStep == BugStep::Write) {
             BugReportInfo info;
             info.build = spec.build;
@@ -438,7 +438,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
 #if MEALKIT_DEBUG_UI
             bugStep = BugStep::Note;
 #else
-            bugStep = BugStep::Shot; // 출시 빌드는 글을 적을 창이 없다
+            bugStep = BugStep::Shot; // shipping builds have no note window
 #endif
         if (!bugFolder.empty() && win.bugReportAt && frameCount == win.bugReportAt) bugStep = BugStep::Shot;
         if (win.gpuCaptureAt && frameCount == win.gpuCaptureAt) rhi::captureNextGpuFrame(false);
@@ -448,7 +448,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         matches.update(now);
         const net::SessionState state = session.state();
         if (!game->started() && state != net::SessionState::Running && state != net::SessionState::Ended)
-            game->lobby(session, gameOptions, ctx.userFolder); // 로비: 로드아웃을 정한다 (호스트가 시작할 때 확정)
+            game->lobby(session, gameOptions, ctx.userFolder); // lobby: decide the loadout (confirmed when the host starts)
 
         if (session.isHost() && state == net::SessionState::Lobby && !session.isOffline()) {
             const bool enter = !menus && input.keyPressed(key::Enter);
@@ -465,10 +465,10 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
                 exitCode = session.desynced() ? 2 : 0;
                 break;
             }
-            if (matches.phase() == MatchPhase::Menu) break; // 게임이 [나가기]를 눌렀다
+            if (matches.phase() == MatchPhase::Menu) break; // the game pressed [Leave]
         }
 
-        // 매치 시작·끝: 시작은 로딩 화면을 한 번 그린 다음 프레임 (게임 화면 흐름이 Running이면 로딩 화면을 연다)
+        // Match start/end: start is on the frame after the loading screen is drawn once (if the game's screen flow is Running it opens the loading screen)
         if (!game->started() && session.state() == net::SessionState::Running) {
             if (loadingShown) {
                 game->start(ctx, scene, gameOptions);
@@ -477,11 +477,11 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
             }
             loadingShown = !loadingShown;
         } else if (game->started() && session.state() != net::SessionState::Running) {
-            game->stop(ctx); // 로비로 돌아감, 나감, 끊김
+            game->stop(ctx); // back to lobby, left, disconnected
             loadingShown = false;
             if (keepingReplays) keepReplay(userFolderPath, project.settings.keepReplays);
         }
-        // 리플레이가 기록과 갈라지면 (다른 빌드·데이터) 그 틱에서 멈춘다
+        // When the replay diverges from the recording (different build/data), pause at that tick
         if (session.isReplay() && session.desynced() && !replayStopped && game->debug()) {
             game->debug()->setPaused(true);
             replayStopped = true;
@@ -494,14 +494,14 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
             if (!debugUiReady) debugUiReady = debugUi.init(window, renderer, {});
             debugUiShown = debugUiReady && !debugUiShown;
         }
-        if (debugUiShown) { // 디버그 창 위에서는 게임이 키·마우스를 받지 않는다
+        if (debugUiShown) { // over debug windows the game doesn't receive keys/mouse
             const ImGuiIO& io = ImGui::GetIO();
             if (io.WantCaptureKeyboard) ctx.keyboardAllowed = false;
             if (io.WantCaptureMouse) ctx.mouseAllowed = false;
         }
 #endif
         front.update(now, dt, input, window.focused(), ctx);
-        for (const auto& [pressFrame, node] : win.uiPresses) // 화면 흐름 시험: 이 프레임에 위젯을 누른다 (게임이 이번 프레임에 액션을 받는다)
+        for (const auto& [pressFrame, node] : win.uiPresses) // screen flow tests: press the widget on this frame (the game receives the action this frame)
             if (pressFrame == frameCount && !front.ui().pressAny(node)) MEALKIT_WARN("--ui-press: no widget '%s' at frame %u", node.c_str(), pressFrame);
         game->update(ctx, dt);
         audio.setMuted(win.mute || (front.settings().values().audio.muteUnfocused && !window.focused()));
@@ -513,7 +513,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         if (lastFrame && !win.capturePath.empty() && win.captureTick == 0) renderer.requestCapture(win.capturePath.c_str());
         if (game->finished() && exitDeadline == 0.0) {
             exitCode = reportFinish(*game, session, opt, win);
-            exitDeadline = now + 1.0; // 상대가 마지막 틱을 받을 시간을 준 뒤 종료
+            exitDeadline = now + 1.0; // exit after giving the other side time to receive the last tick
         }
 
         if (!window.minimized()) {
@@ -521,14 +521,14 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
             render::FrameParams frame;
             drawList.clear();
             game->buildFrame(ctx, now, frame, drawList);
-            feedback.addParticles(drawList); // 연출 표의 effect (불투명 3D 다음에 그린다)
+            feedback.addParticles(drawList); // effects from the feedback table (drawn after opaque 3D)
             front.afterBuildFrame(frame);
-            frame.time = static_cast<f32>(std::fmod(now, 4096.0)); // 바람 흔들림 (f32 정밀도 안에서 돈다)
+            frame.time = static_cast<f32>(std::fmod(now, 4096.0)); // wind sway (wraps within f32 precision)
 #if MEALKIT_DEBUG_UI
             if (debugUiShown) {
                 debugUi.newFrame();
                 ImGui::SetNextWindowPos(ImVec2(10.0f, static_cast<f32>(window.height()) - 10.0f), ImGuiCond_Always,
-                                        ImVec2(0.0f, 1.0f)); // 왼쪽 아래 (게임 창은 왼쪽 위)
+                                        ImVec2(0.0f, 1.0f)); // bottom left (the game window is top left)
                 if (ImGui::Begin("MealKit", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
                     ImGui::TextUnformatted(perfText.c_str());
                     ImGui::TextDisabled("F1: hide | V: vsync | F9: bug report | F12: screenshot");
@@ -543,17 +543,17 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
                     ImGui::TextUnformatted("What happened? (Enter: save, Esc: cancel)");
                     if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
                     if (ImGui::InputText("##note", bugNote, sizeof(bugNote), ImGuiInputTextFlags_EnterReturnsTrue))
-                        bugStep = BugStep::Shot; // 다음 프레임은 이 창 없이 찍는다
+                        bugStep = BugStep::Shot; // the next frame is captured without this window
                     else if (ImGui::IsKeyPressed(ImGuiKey_Escape)) bugStep = BugStep::None;
                 }
                 ImGui::End();
             }
-            // 게임 코드의 debug::line/box/text (글자는 디버그 UI가 켜져 있을 때만)
+            // Game code's debug::line/box/text (text only when the debug UI is on)
             debug::flushDebugDraw(drawList, models.boxMesh(), frame, now, debugUiShown);
 #endif
             const bool active = renderer.beginFrame(frame);
             if (active) drawList.submit(renderer);
-            if (active) front.renderUi(renderer); // 3D 다음, 디버그 UI 전
+            if (active) front.renderUi(renderer); // after 3D, before debug UI
 #if MEALKIT_DEBUG_UI
             if (debugUiShown) debugUi.render(renderer, active);
 #endif
@@ -564,7 +564,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         MEALKIT_FRAME_MARK();
         if (lastFrame) break;
 
-        // ---- 창 제목에 상태 표시 (4Hz) ----
+        // ---- Status in the window title (4Hz) ----
         const bool perfSample = perf.update(dt, {&renderer, &session, &audio, game});
         if (benchmark && bench.frame(dt, game->started(), perfSample ? &perf.sample() : nullptr)) {
             exitCode = writeBenchmark(bench, project.settings, spec, renderer, opt, win.benchmarkPath) ? 0 : 1;
@@ -575,7 +575,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         liveServer.update();
 #endif
         if (perfSample) {
-            // 플레이어에게 보이는 글자는 문자열 표(assets/strings), 성능 숫자는 개발용이라 영어 그대로
+            // Text shown to players comes from string tables (assets/strings); performance numbers are for developers, so English as is
             std::string status = lobbyStatus(matches, front.strings());
             const bool running = status.empty();
             if (running) status = perf.line();
@@ -590,7 +590,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     }
 
     if (game->started()) game->stop(ctx);
-    if (keepingReplays) keepReplay(userFolderPath, project.settings.keepReplays); // 매치 중에 창을 닫았다
+    if (keepingReplays) keepReplay(userFolderPath, project.settings.keepReplays); // the window was closed mid-match
     module.destroy(game);
     matches.shutdown();
     audio.shutdown();

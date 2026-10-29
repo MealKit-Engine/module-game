@@ -28,7 +28,7 @@ void Frontend::init(const FrontendConfig& config) {
 
     if (config.viewTuningType) m_viewTuning.open(*config.viewTuningType, config.viewTuningPath);
     else m_viewTuning.close();
-    m_subtitleScreen = ui::kNoScreen; // closeAll로 닫혔다
+    m_subtitleScreen = ui::kNoScreen; // closed by closeAll
     m_hasSubtitleScreen = !findAsset(std::string("assets/") + kSubtitleScreen).empty();
 }
 
@@ -44,12 +44,12 @@ void Frontend::update(f64 now, f64 dt, const Input& input, bool padAllowed, Game
         ctx.viewTuningData = m_viewTuning.view();
     }
     m_pads.update(dt);
-    // UI가 먼저 마우스·포커스를 가져간다 (UI 위의 클릭은 게임이 받지 않는다). 키보드·게임패드 조작은 지난 프레임의 ui.* 액션
+    // The UI takes mouse/focus first (clicks on the UI aren't received by the game). Keyboard/gamepad navigation uses last frame's ui.* actions
     m_ui.update({&input, &m_actions, ctx.mouseAllowed, ctx.keyboardAllowed}, ctx.viewport, dt);
     if (m_ui.wantsMouse()) ctx.mouseAllowed = false;
     if (m_ui.wantsKeyboard()) ctx.keyboardAllowed = false;
-    m_settings.update(&input, dt); // 설정 화면의 액션 (게임 update 전)
-    // 자막 (접근성): 자막이 있는 소리가 나는 동안 표준 자막 화면
+    m_settings.update(&input, dt); // settings screen actions (before game update)
+    // Subtitles (accessibility): the standard subtitle screen while a sound with subtitles is playing
     const std::vector<audio::Subtitle>& subtitles = m_config.audio->subtitles();
     const bool showSubtitles = m_hasSubtitleScreen && m_settings.values().gameplay.subtitles && !subtitles.empty();
     if (showSubtitles && !m_ui.isOpen(m_subtitleScreen)) {
@@ -66,7 +66,7 @@ void Frontend::update(f64 now, f64 dt, const Input& input, bool padAllowed, Game
 }
 
 void Frontend::afterBuildFrame(render::FrameParams& frame) {
-    m_ui.setCamera(frame.viewProj); // 월드 위 UI: buildFrame이 drawAt으로 넣은 것을 이 카메라로 화면에 놓는다
+    m_ui.setCamera(frame.viewProj); // world-space UI: places what buildFrame added via drawAt on screen with this camera
     m_config.audio->setListener(frame.cameraPos, frame.cameraForward);
     m_config.feedback->screenTint(frame.tintColor, frame.tintAmount);
 }

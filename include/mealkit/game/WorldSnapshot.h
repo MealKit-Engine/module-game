@@ -6,14 +6,14 @@
 #include <cstring>
 #include <vector>
 
-// World 전체 스냅샷: 선언한 상태 필드(reflect) + 물리. 같은 프로세스 안에서 되감기와 그림자 시뮬레이션에 쓴다.
-// World 약속: state(MEALKIT_STRUCT, state.tick 필드), physics(physics::PhysicsWorld), hash().
-// 이 셋 밖의 값(매치 시작 때 정해지는 spawns, tuning 등)은 스냅샷에 들어가지 않는다 (같은 매치 안에서는 바뀌지 않는다).
+// Full World snapshot: declared state fields (reflect) + physics. Used for rewind and shadow simulation within the same process.
+// World contract: state (MEALKIT_STRUCT, state.tick field), physics (physics::PhysicsWorld), hash().
+// Values outside these three (spawns, tuning etc. decided at match start) aren't in the snapshot (they don't change within the same match).
 namespace mealkit::game {
 
 struct WorldSnapshot {
     u32 tick = 0;
-    u64 hash = 0; // 저장할 때의 World::hash() (복원 확인용)
+    u64 hash = 0; // World::hash() at save time (to verify restore)
     std::vector<u8> state;
     physics::PhysicsSnapshot physics;
 
@@ -30,7 +30,7 @@ void saveSnapshot(const World& world, WorldSnapshot& out) {
     out.hash = world.hash();
 }
 
-// 다른 프로세스로 보낼 바이트 (중간 참가·재접속, 같은 빌드끼리): [틱 u32][해시 u64][상태 크기 u32][상태][물리]
+// Bytes to send to another process (late join/reconnect, between identical builds): [tick u32][hash u64][state size u32][state][physics]
 inline void writeSnapshotBytes(const WorldSnapshot& s, std::vector<u8>& out) {
     std::vector<u8> physics;
     s.physics.write(physics);
@@ -54,7 +54,7 @@ inline bool readSnapshotBytes(const u8* data, size_t size, WorldSnapshot& out) {
     return out.physics.read(data + 16 + stateSize, size - 16 - stateSize);
 }
 
-// 복원한 뒤의 hash()가 저장할 때와 다르면 false (선언하지 않은 상태가 있다는 뜻)
+// false if hash() after restore differs from save time (meaning there's undeclared state)
 template <class World>
 bool loadSnapshot(World& world, const WorldSnapshot& snapshot) {
     reflect::ByteReader r(snapshot.state.data(), snapshot.state.size());

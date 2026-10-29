@@ -20,105 +20,105 @@ struct Scene;
 }
 } // namespace mealkit
 
-// 엔진(게임 실행 파일, 범용 에디터)과 게임 코드 사이의 경계.
-// 게임은 GameInstance를 구현하고, 에디터용 게임 DLL은 MEALKIT_GAME_MODULE로 만드는 함수를 내보낸다.
-// 출시용 exe는 게임 클래스를 직접 쓴다 (final이면 가상 호출도 사라진다).
+// Boundary between the engine (game executable, general-purpose editor) and game code.
+// The game implements GameInstance, and the editor game DLL exports a factory function via MEALKIT_GAME_MODULE.
+// The shipping exe uses the game class directly (if final, even virtual calls disappear).
 namespace mealkit::game {
 
-// DLL 경계의 약속이 바뀌면 올린다. 에디터는 번호가 다른 게임 DLL을 불러오지 않는다.
-// 2: GameContext, 3: 게임 오브젝트 종류, 4: 튜닝, 5: 상태 보기, 6: 디버그 제어, 7: 프로젝트 설정·문자열 필드, 8: 해시 로그·입력 기록,
-// 9: 화면용 튜닝(ViewTuningType, GameContext::viewTuning)·Ticks·Color 필드, 10: 정의 데이터 표(MEALKIT_TABLE, RowRef),
-// 11: 소리(GameContext::audio), FrameParams::cameraForward, 12: 연출 표(GameContext::feedback, EventType), MEALKIT_ENUM,
-// 13: 입력 액션(GameContext::actions), 14: 디버그 UI(GameInstance::debugUi, 에디터와 게임 DLL이 mealkit.dll의 ImGui 하나를 쓴다),
-// 15: 문자열 표(GameContext::strings), 16: 게임 화면 UI(GameContext::ui, GameModule::viewModels),
-// 17: 플레이어 설정(GameContext::settings), 18: GameContext::userFolder (세이브), 19: 매치 시작 데이터(GameInstance::lobby, MatchInfo::loadouts),
-// 20: 화면 흐름(GameContext::match, GameInstance::menus·stop, 로비 이름·준비·채팅), 21: GameModule::build (빌드 정보)
+// Bump when the DLL boundary contract changes. The editor doesn't load game DLLs with a different number.
+// 2: GameContext, 3: game object kinds, 4: tuning, 5: state view, 6: debug controls, 7: project settings/string fields, 8: hash log/input recording,
+// 9: view tuning (ViewTuningType, GameContext::viewTuning)/Ticks/Color fields, 10: definition data tables (MEALKIT_TABLE, RowRef),
+// 11: sound (GameContext::audio), FrameParams::cameraForward, 12: feedback table (GameContext::feedback, EventType), MEALKIT_ENUM,
+// 13: input actions (GameContext::actions), 14: debug UI (GameInstance::debugUi, the editor and game DLL share one ImGui from mealkit.dll),
+// 15: string tables (GameContext::strings), 16: game screen UI (GameContext::ui, GameModule::viewModels),
+// 17: player settings (GameContext::settings), 18: GameContext::userFolder (saves), 19: match start data (GameInstance::lobby, MatchInfo::loadouts),
+// 20: screen flow (GameContext::match, GameInstance::menus/stop, lobby names/ready/chat), 21: GameModule::build (build info)
 inline constexpr u32 kApiVersion = 21;
 
 struct PlayOptions {
-    bool bot = false;    // 스크립트 입력 (자동 테스트)
-    u32 exitTick = 0;    // 이 틱을 실행하면 finished() = true
-    u32 captureTick = 0; // 이 틱을 지나면 captureDue() = true (한 번)
+    bool bot = false;    // scripted input (automated tests)
+    u32 exitTick = 0;    // finished() = true after running this tick
+    u32 captureTick = 0; // captureDue() = true after passing this tick (once)
     bool capture = false;
-    u32 physicsThreads = 0; // 0 = 자동
-    std::string tuningPath; // 비어 있으면 assets/game.tuning (에디터는 저장 안 된 값을 임시 파일로 넘긴다)
-    bool shadow = false;    // 그림자 시뮬레이션: World를 하나 더 돌려 매 틱 비교 (에디터, 시뮬레이션 CPU 2배)
-    bool record = false;    // 입력 기록 + 스냅샷: 일시정지, 한 틱 진행, 되감기 (에디터 혼자 플레이)
-    std::string hashLogPath;      // 비어 있지 않으면 틱마다 "<틱> <상태 해시>" 한 줄 (--hash-log, 빌드·플랫폼 사이 비교)
-    std::string recordInputsPath; // 비어 있지 않으면 확정된 입력과 해시를 파일로 (--record-inputs, game/InputRecord.h)
-    // 디싱크 덤프 폴더 (game/DesyncDump.h): 비어 있지 않으면 여러 명 매치에서 스냅샷을 몇 개 남겨 두고, 디싱크가 나면 갈라진 틱의 상태를 쓴다
+    u32 physicsThreads = 0; // 0 = auto
+    std::string tuningPath; // assets/game.tuning if empty (the editor passes unsaved values as a temp file)
+    bool shadow = false;    // shadow simulation: runs one more World and compares every tick (editor, 2x simulation CPU)
+    bool record = false;    // input recording + snapshots: pause, single tick step, rewind (editor solo play)
+    std::string hashLogPath;      // if not empty, one "<tick> <state hash>" line per tick (--hash-log, comparing across builds/platforms)
+    std::string recordInputsPath; // if not empty, confirmed inputs and hashes go to a file (--record-inputs, game/InputRecord.h)
+    // Desync dump folder (game/DesyncDump.h): if not empty, keeps a few snapshots in multiplayer matches and writes the diverged tick's state on desync
     std::string desyncDumpDir;
-    u32 desyncTestTick = 0; // 0이 아니면 이 틱을 실행하기 전에 물리를 조금 바꾼다 (--desync-test, 디싱크 진단 시험)
+    u32 desyncTestTick = 0; // if not 0, perturbs physics slightly before running this tick (--desync-test, desync diagnostics test)
 };
 
-// 한 판: 결정론 시뮬레이션 실행, 로컬 입력, 카메라, 그리기.
+// One match: runs the deterministic simulation, local input, camera, drawing.
 class GameInstance {
 public:
     virtual ~GameInstance() = default;
 
-    // 매치가 시작되기 전 매 프레임 (혼자 플레이는 세션을 열기 직전 한 번): 이 플레이어의 매치 시작 데이터를 정한다
-    // (game::setLoadout, mealkit/game/Loadout.h). userFolder는 세이브를 읽을 곳 (비어 있으면 없음)
+    // Every frame before the match starts (once just before opening the session for solo play): decides this player's match start data
+    // (game::setLoadout, mealkit/game/Loadout.h). userFolder is where to read saves (none if empty)
     virtual void lobby(net::LockstepSession& session, const PlayOptions& options, const std::string& userFolder) {
         (void)session, (void)options, (void)userFolder;
     }
-    // 세션이 Running이 되면 한 번 호출한다 (그 프레임은 로딩 화면을 그리게 한 프레임 뒤에).
+    // Called once when the session becomes Running (that frame is one frame after drawing the loading screen).
     virtual void start(GameContext& ctx, const scene::Scene& scene, const PlayOptions& options) = 0;
     virtual bool started() const = 0;
-    // 매치가 끝나 세션이 Running이 아니게 되면(로비로 돌아감, 나감, 끊김) 한 번. 다음 매치에서 start가 다시 불린다
+    // Once when the match ends and the session is no longer Running (back to lobby, left, disconnected). start is called again for the next match
     virtual void stop(GameContext& ctx) { (void)ctx; }
-    // 게임이 화면 흐름(타이틀·메뉴·로비·결과 화면, ctx.match)을 그린다. 그러면 엔진은 명령줄이 없을 때 메뉴(세션 없음)에서 시작하고
-    // Esc·Enter를 쓰지 않는다. false면 예전처럼 명령줄 그대로 바로 혼자 플레이하고, 호스트는 Enter로 시작, Esc로 끝낸다
+    // The game draws the screen flow (title/menu/lobby/results screens, ctx.match). Then the engine starts at the menu (no session) when there's no command line
+    // and doesn't use Esc/Enter. If false, plays solo directly from the command line as before; the host starts with Enter and quits with Esc
     virtual bool menus() const { return false; }
-    // 매 프레임: 카메라 입력과 시뮬레이션 틱 실행.
+    // Every frame: camera input and running simulation ticks.
     virtual void update(GameContext& ctx, f64 dt) = 0;
-    // 장면을 그릴 데이터를 채운다 (ctx.viewport 영역, 로컬 플레이어는 ctx.session.localPlayer()).
+    // Fills the data to draw the scene (ctx.viewport area, local player is ctx.session.localPlayer()).
     virtual void buildFrame(GameContext& ctx, f64 now, render::FrameParams& frame, render::DrawList& out) = 0;
 
-    // 아래 값은 매치 전(메뉴·로비·로딩 프레임)에도 불린다: 매치가 없으면 0이나 빈 값을 돌려준다
+    // The values below are also called before a match (menu/lobby/loading frames): return 0 or empty values when there's no match
     virtual u32 nextTick() const = 0;
     virtual u64 stateHash() const = 0;
     virtual u32 activeBodies() const = 0;
     virtual bool finished() const = 0;
     virtual bool captureDue() = 0;
-    virtual f64 takeSimMsPerTick() = 0; // 지난 호출 이후 평균
+    virtual f64 takeSimMsPerTick() = 0; // average since the last call
 
-    // 튜닝 값을 바로 바꾼다 (에디터 혼자 플레이). tuning은 GameModule::tuningType 타입의 값이다.
+    // Changes tuning values immediately (editor solo play). tuning is a value of type GameModule::tuningType.
     virtual void setTuning(const void* tuning) = 0;
-    // 시뮬레이션 상태 (에디터 [상태] 패널, 읽기 전용). 다음 update까지 유효하다.
+    // Simulation state (editor [State] panel, read-only). Valid until the next update.
     virtual reflect::View stateView() const = 0;
-    // 일시정지·되감기·그림자 시뮬레이션 (game::Simulation이 구현한다). 없으면 nullptr.
+    // Pause/rewind/shadow simulation (implemented by game::Simulation). nullptr if none.
     virtual SimDebug* debug() { return nullptr; }
-    // 디버그 UI (개발 빌드·에디터, docs/CODING_MODEL.md "코드로 짜는 UI"): ImGui 프레임 안에서 부른다. 몸은 #if MEALKIT_DEBUG_UI로 감싼다
-    // (출시 빌드에는 ImGui가 없다). 시뮬레이션을 바꾸는 버튼은 상태를 고치지 않고 확정 명령(mealkit/sim/Commands.h)을 보낸다.
-    // 출시 exe는 F1로 켜고 끈다. 에디터는 플레이 중 항상 부른다.
+    // Debug UI (dev builds/editor, docs/CODING_MODEL.md "UI written in code"): called inside an ImGui frame. Wrap the body in #if MEALKIT_DEBUG_UI
+    // (shipping builds have no ImGui). Buttons that change the simulation don't modify state; they send confirmed commands (mealkit/sim/Commands.h).
+    // The shipping exe toggles it with F1. The editor always calls it during play.
     virtual void debugUi(GameContext& ctx) { (void)ctx; }
 };
 
-// 게임 DLL이 내보내는 정보. 에디터가 mealkitGetGameModule()로 받는다.
+// Info exported by the game DLL. The editor receives it via mealkitGetGameModule().
 struct GameModule {
     u32 apiVersion = kApiVersion;
     const char* name = "";
-    GameInstance* (*create)() = nullptr;      // 에디터가 플레이를 누를 때
-    void (*destroy)(GameInstance*) = nullptr; // DLL 안에서 지운다 (같은 힙)
-    // 게임이 MEALKIT_OBJECT로 선언한 씬 오브젝트 종류 (에디터 [추가] 메뉴, 인스펙터). DLL을 내리면 무효가 된다.
+    GameInstance* (*create)() = nullptr;      // when the editor presses play
+    void (*destroy)(GameInstance*) = nullptr; // deleted inside the DLL (same heap)
+    // Scene object kinds the game declared with MEALKIT_OBJECT (editor [Add] menu, inspector). Invalid after the DLL is unloaded.
     const std::vector<const reflect::TypeInfo*>* (*objectTypes)() = nullptr;
-    // 게임 튜닝 구조체 (GameClass::TuningType). 에디터 [튜닝] 패널이 assets/game.tuning을 이 타입으로 편집한다.
+    // Game tuning struct (GameClass::TuningType). The editor [Tuning] panel edits assets/game.tuning with this type.
     const reflect::TypeInfo* (*tuningType)() = nullptr;
-    // 게임이 더한 프로젝트 설정 (GameClass::ProjectSettingsType, 없으면 nullptr). mealkit.project의 game.* 줄.
+    // Project settings added by the game (GameClass::ProjectSettingsType, nullptr if none). game.* lines in mealkit.project.
     const reflect::TypeInfo* (*projectSettingsType)() = nullptr;
-    // 화면용 튜닝 (GameClass::ViewTuningType, 없으면 nullptr). 에디터 [튜닝] 패널의 "화면" 탭, assets/view.tuning.
+    // View tuning (GameClass::ViewTuningType, nullptr if none). The "View" tab of the editor [Tuning] panel, assets/view.tuning.
     const reflect::TypeInfo* (*viewTuningType)() = nullptr;
-    // 게임이 MEALKIT_TABLE로 등록한 정의 데이터 표 (에디터 [표] 패널, 콘텐츠 해시). DLL을 내리면 무효가 된다.
+    // Definition data tables the game registered with MEALKIT_TABLE (editor [Tables] panel, content hash). Invalid after the DLL is unloaded.
     const reflect::TableList* (*tables)() = nullptr;
-    // 틱 이벤트 타입 (GameClass::EventType, 없으면 nullptr). 에디터 [연출] 패널이 종류(MEALKIT_ENUM) 이름과 필드를 보여 준다.
+    // Tick event type (GameClass::EventType, nullptr if none). The editor [Feedback] panel shows kind (MEALKIT_ENUM) names and fields.
     const reflect::TypeInfo* (*eventType)() = nullptr;
-    // 게임이 MEALKIT_VIEWMODEL로 선언한 뷰 모델 (에디터 [UI] 미리보기의 가짜 값, 바인딩 검사). DLL을 내리면 무효가 된다.
+    // View models the game declared with MEALKIT_VIEWMODEL (fake values in the editor [UI] preview, binding checks). Invalid after the DLL is unloaded.
     const std::vector<const reflect::TypeInfo*>* (*viewModels)() = nullptr;
-    // 게임 빌드 정보 (게임 버전·커밋·시뮬레이션 버전, mealkit/game/BuildInfo.h)
+    // Game build info (game version/commit/simulation version, mealkit/game/BuildInfo.h)
     BuildInfo build;
 };
 
-// 매치 데이터를 읽을 때 쓰는 게임 타입 (game::loadMatchData)
+// Game types used when reading match data (game::loadMatchData)
 inline GameTypes gameTypes(const GameModule& module) {
     GameTypes t;
     t.objectTypes = module.objectTypes ? module.objectTypes() : nullptr;
@@ -128,7 +128,7 @@ inline GameTypes gameTypes(const GameModule& module) {
     return t;
 }
 
-// GameClass::ProjectSettingsType이 있으면 그 타입 (MEALKIT_GAME_MODULE이 쓴다)
+// The GameClass::ProjectSettingsType type if present (used by MEALKIT_GAME_MODULE)
 template <class GameClass>
 const reflect::TypeInfo* gameProjectSettingsType() {
     if constexpr (requires { typename GameClass::ProjectSettingsType; })
@@ -137,7 +137,7 @@ const reflect::TypeInfo* gameProjectSettingsType() {
         return nullptr;
 }
 
-// GameClass::ViewTuningType이 있으면 그 타입
+// The GameClass::ViewTuningType type if present
 template <class GameClass>
 const reflect::TypeInfo* gameViewTuningType() {
     if constexpr (requires { typename GameClass::ViewTuningType; })
@@ -154,7 +154,7 @@ const reflect::TypeInfo* gameEventType() {
         return nullptr;
 }
 
-// 게임 클래스의 모듈 정보 (MEALKIT_GAME_MODULE: 에디터용 DLL, MEALKIT_GAME_MAIN: 출시 exe가 같은 것을 쓴다)
+// Module info of the game class (MEALKIT_GAME_MODULE: editor DLL; MEALKIT_GAME_MAIN: the shipping exe uses the same)
 template <class GameClass>
 const GameModule& gameModuleOf(const char* name) {
     static const GameModule module{
@@ -178,7 +178,7 @@ inline constexpr const char* kGetGameModuleSymbol = "mealkitGetGameModule";
 
 } // namespace mealkit::game
 
-// 게임 DLL에서 한 번 쓴다: MEALKIT_GAME_MODULE("Sandbox", sandbox::GameSession)
+// Used once in the game DLL: MEALKIT_GAME_MODULE("Sandbox", sandbox::GameSession)
 #define MEALKIT_GAME_MODULE(NameLiteral, GameClass)                                                                    \
     extern "C" __declspec(dllexport) const ::mealkit::game::GameModule* mealkitGetGameModule() {                       \
         return &::mealkit::game::gameModuleOf<GameClass>(NameLiteral);                                                 \

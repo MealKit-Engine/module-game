@@ -7,11 +7,11 @@
 namespace mealkit::game {
 
 namespace {
-constexpr u32 kMaxRampWidth = 1024; // 램프는 첫 줄만 쓴다. 더 큰 그림은 줄여 읽는다
+constexpr u32 kMaxRampWidth = 1024; // only the first row of the ramp is used. Larger images are downscaled on read
 } // namespace
 
 bool applyRenderStyle(const ProjectSettings& settings, render::Renderer& renderer, RenderStyleState& state) {
-    renderer.setLightsPerObject(settings.pointLightsPerObject); // 값 몇 개라 매번 넘긴다
+    renderer.setLightsPerObject(settings.pointLightsPerObject); // just a few values, so passed every time
     renderer.setShadows({settings.shadows, settings.shadowCascades, settings.shadowMapSize, settings.shadowDistance});
     const f32 gpuBudgetMs = settings.gpuBudgetOpaqueMs + settings.gpuBudgetShadowMs + settings.gpuBudgetPostMs + settings.gpuBudgetVfxMs +
                             settings.gpuBudgetUiMs + settings.gpuBudgetSpareMs;

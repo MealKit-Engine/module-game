@@ -23,23 +23,23 @@
 #include <type_traits>
 #include <variant>
 
-// 헤드리스 실행: 창·렌더러·오디오 없이 World만 돌린다 (CI 결정론 비교, 규칙 테스트, mp_test).
-//   <게임>_headless 실행 파일(sim/ + app/Headless.cpp만, 엔진 코어만 링크)과 출시 exe의 --headless가 같은 코드다.
-//   입력은 항상 봇 입력. 틱별 해시 로그(--hash-log), 입력 기록(--record-inputs)·재생(--replay-inputs, game/InputRecord.h).
+// Headless run: runs only the World without window/renderer/audio (CI determinism comparison, rule tests, mp_test).
+//   The <game>_headless executable (sim/ + app/Headless.cpp only, links only the engine core) and the shipping exe's --headless are the same code.
+//   Input is always bot input. Per-tick hash log (--hash-log), input recording (--record-inputs) and replay (--replay-inputs, game/InputRecord.h).
 //
-// 게임은 app/Headless.cpp에 클래스 하나를 두고 MEALKIT_HEADLESS_GAME(클래스)를 쓴다 (docs/CODING_MODEL.md "헤드리스 진입점"):
-//   using World = ...;                  // game::Simulation의 World 약속 (state, step, hash)
+// The game puts one class in app/Headless.cpp and uses MEALKIT_HEADLESS_GAME(class) (docs/CODING_MODEL.md "Headless entry point"):
+//   using World = ...;                  // game::Simulation's World contract (state, step, hash)
 //   using TuningType = ...;             // assets/game.tuning
-//   using ProjectSettingsType = ...;    // (선택) mealkit.project의 game.* 항목
+//   using ProjectSettingsType = ...;    // (optional) game.* items in mealkit.project
 //   static void startWorld(World&, const game::MatchInfo&, const TuningType&, const scene::Scene& flatScene,
-//                          asset::ModelCache&, u32 physicsThreads);   // 매치 시작 (GameSession도 같은 함수를 쓴다)
-//   static net::PlayerInput botInput(u32 tick, u8 player);            // --bot 입력 (GameSession도 같은 함수를 쓴다)
-//   static void botCommands(u32 tick, u8 player, net::LockstepSession&); // (선택) --bot 확정 명령 (mealkit/sim/Commands.h)
-//   static void botLoadout(u8 player, net::LockstepSession&);       // (선택) 봇의 매치 시작 데이터 (mealkit/game/Loadout.h)
-//   static void defaults(game::MatchOptions&, const ProjectSettingsType&); // (선택) 포트·인원·매치 데이터 기본값
+//                          asset::ModelCache&, u32 physicsThreads);   // match start (GameSession uses the same function)
+//   static net::PlayerInput botInput(u32 tick, u8 player);            // --bot input (GameSession uses the same function)
+//   static void botCommands(u32 tick, u8 player, net::LockstepSession&); // (optional) --bot confirmed commands (mealkit/sim/Commands.h)
+//   static void botLoadout(u8 player, net::LockstepSession&);       // (optional) bot match start data (mealkit/game/Loadout.h)
+//   static void defaults(game::MatchOptions&, const ProjectSettingsType&); // (optional) port/player count/match data defaults
 namespace mealkit::game {
 
-// 세션을 연다 (혼자, 방 만들기, 참가). 실패하면 로그를 남기고 false.
+// Opens a session (solo, create room, join). On failure, logs and returns false.
 bool startHeadlessSession(net::LockstepSession& session, const MatchOptions& options, u64 seed);
 void printFinal(u32 tick, u64 hash, bool desynced);
 
@@ -49,7 +49,7 @@ auto headlessGameProjectSettings() {
     else return std::monostate{};
 }
 
-// --replay-inputs: 기록된 입력으로 World를 처음부터 다시 돌리고, 틱마다 기록된 해시와 비교한다
+// --replay-inputs: reruns the World from the start with recorded inputs and compares with the recorded hash every tick
 template <class World, class Start>
 int replayHeadless(const MatchOptions& options, u64 contentHash, Start&& start) {
     InputRecording rec;
@@ -103,16 +103,16 @@ int runHeadless(int argc, char** argv) {
         printGameUsage(nullptr, true);
         return 1;
     }
-    MEALKIT_INFO("CPU: %s", cpuName().c_str()); // 다른 PC 결정론 기록용
+    MEALKIT_INFO("CPU: %s", cpuName().c_str()); // for recording determinism on other PCs
     GameTypes types;
     types.objectTypes = &reflect::moduleObjectTypes();
     types.tuningType = &reflect::typeOf<Tuning>();
     if constexpr (kHasGameProject) types.projectSettingsType = &reflect::typeOf<GameProject>();
     types.tables = &reflect::moduleTables();
-    asset::ModelCache models; // CPU 데이터만 (렌더러 없음)
+    asset::ModelCache models; // CPU data only (no renderer)
     MatchData data;
     if (!loadMatchData(types, {options.scenePath, options.tuningPath}, models, data)) return 1;
-    options.inputDelay = msToTicks(options.inputDelayMs); // 틱레이트(프로젝트 설정)를 안 뒤
+    options.inputDelay = msToTicks(options.inputDelayMs); // after the tick rate (project setting) is known
     const Tuning& tuning = *static_cast<const Tuning*>(data.tuning.data());
     if constexpr (kHasGameProject)
         if constexpr (requires { Game::defaults(options, std::declval<const GameProject&>()); })
@@ -133,19 +133,19 @@ int runHeadless(int argc, char** argv) {
     session.setAcceptOtherBuilds(options.anyBuild);
     if (!options.playerName.empty()) session.setLocalName(options.playerName);
     session.setConditions({options.netLagMs, options.netJitterMs, options.netLossPercent});
-    const BuildInfo build = MEALKIT_THIS_BUILD; // 게임의 Headless.cpp에서 펼쳐진다 (빌드 정보 헤더)
+    const BuildInfo build = MEALKIT_THIS_BUILD; // expanded in the game's Headless.cpp (build info header)
     session.setBuild(build.simVersion, build.gameVersion);
     session.setContentParts(data.contentParts);
     MEALKIT_INFO("Build: version %s, commit %s, simulation %016llx, %s", build.gameVersion, build.commit,
                  static_cast<unsigned long long>(build.simVersion), net::determinismGroup());
     net::AutoDelay autoDelay = autoDelayOf(data.project.settings, 1000.0f / static_cast<f32>(reflect::tickRate()));
-    autoDelay.enabled = autoDelay.enabled && !options.delayGiven; // --delay: 고정
+    autoDelay.enabled = autoDelay.enabled && !options.delayGiven; // --delay: fixed
     session.setAutoDelay(autoDelay);
     const u64 seed = options.seed ? options.seed : static_cast<u64>(std::time(nullptr));
     auto loadout = [&] {
         if constexpr (requires { Game::botLoadout(u8{0}, session); }) Game::botLoadout(session.localPlayer(), session);
     };
-    loadout(); // 혼자면 세션을 열면서 바로 시작하므로 그 전에
+    loadout(); // solo starts right when the session opens, so before that
     if (!startHeadlessSession(session, options, seed)) return 1;
 
     PlayOptions play;
@@ -161,10 +161,10 @@ int runHeadless(int argc, char** argv) {
 
     Simulation<World> sim;
     const bool offline = options.mode == MatchOptions::Mode::Offline;
-    // 혼자면 쉬지 않고 돈다. 네트워크면 이번 반복에 틱이 나아가지 않았을 때만(입력 대기) 1ms 잔다.
-    // 바쁜 대기를 하면 코어가 적은 PC(CI 러너)에서 여러 피어의 물리 작업 스레드가 돌 시간을 뺏는다.
+    // Solo runs without rest. With networking, sleeps 1ms only when no tick advanced this iteration (waiting for input).
+    // Busy waiting would steal time from the physics worker threads of multiple peers on PCs with few cores (CI runners).
     const u32 autoStart = options.autoStart ? options.autoStart : options.maxPlayers;
-    const f64 frameDt = static_cast<f64>(tickDt()) * Simulation<World>::kCatchUpTicks; // 한 번에 최대한 따라잡는다
+    const f64 frameDt = static_cast<f64>(tickDt()) * Simulation<World>::kCatchUpTicks; // catch up as much as possible at once
     int exitCode = 0;
     f64 exitDeadline = 0.0;
     for (;;) {
@@ -195,7 +195,7 @@ int runHeadless(int argc, char** argv) {
                 return Game::botInput(tick, session.localPlayer());
             },
             [](const World&) {});
-        // 튕김 흉내: 처음 이어받은 호스트만, 이 틱을 넘는 순간 (그 뒤에 이어받은 사람은 튕기지 않는다)
+        // Simulated crash: only the first successor host, the moment it passes this tick (later successors don't crash)
         if (options.abortHostTick && session.isHost() && session.hostMigrations() == 1 && sim.started() &&
             tickBefore <= options.abortHostTick && sim.nextTick() > options.abortHostTick) {
             MEALKIT_WARN("--abort-host-at %u: exiting without closing the session", options.abortHostTick);
@@ -210,7 +210,7 @@ int runHeadless(int argc, char** argv) {
                 if (sim.shadow().desynced) exitCode = 5;
             }
             std::fflush(stdout);
-            exitDeadline = offline ? now : now + 1.0; // 상대가 마지막 틱을 받을 시간을 준 뒤 종료
+            exitDeadline = offline ? now : now + 1.0; // exit after giving the other side time to receive the last tick
         }
         const bool idle = exitDeadline > 0.0 || !sim.started() || sim.nextTick() == tickBefore;
         if (!offline && idle) sleepSeconds(0.001);
@@ -221,11 +221,11 @@ int runHeadless(int argc, char** argv) {
 
 } // namespace mealkit::game
 
-// 출시 exe의 main이 --headless를 받으면 부른다 (MEALKIT_HEADLESS_GAME이 정의한다)
+// Called when the shipping exe's main receives --headless (defined by MEALKIT_HEADLESS_GAME)
 int mealkitHeadlessMain(int argc, char** argv);
 
-// app/Headless.cpp에서 한 번 쓴다: MEALKIT_HEADLESS_GAME(sandbox::Headless)
-// <게임>_headless 타깃(MEALKIT_HEADLESS_TARGET)에서는 main도 된다.
+// Used once in app/Headless.cpp: MEALKIT_HEADLESS_GAME(sandbox::Headless)
+// In the <game>_headless target (MEALKIT_HEADLESS_TARGET) it also becomes main.
 #if defined(MEALKIT_HEADLESS_TARGET)
 #define MEALKIT_HEADLESS_MAIN_                                                                                         \
     int main(int argc, char** argv) { return mealkitHeadlessMain(argc, argv); }

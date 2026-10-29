@@ -54,7 +54,7 @@ std::string join(const std::vector<std::string>& parts, const char* sep) {
 f64 frameMsPercentile(std::vector<f64>& frameSeconds, f64 percent) {
     if (frameSeconds.empty()) return 0.0;
     std::sort(frameSeconds.begin(), frameSeconds.end());
-    // 가장 가까운 순위 (nearest-rank): 100프레임에 99%면 99번째
+    // Nearest rank: for 99% of 100 frames, the 99th
     const f64 rank = std::ceil(percent / 100.0 * static_cast<f64>(frameSeconds.size()));
     const size_t i = static_cast<size_t>(std::clamp(rank, 1.0, static_cast<f64>(frameSeconds.size()))) - 1;
     return frameSeconds[i] * 1000.0;
@@ -109,7 +109,7 @@ bool FrameStats::update(f64 dt, const FrameSources& from) {
         const rhi::GpuMemory vram = from.renderer->gpuMemory();
         s.gpuMemoryUsed = vram.used;
         s.gpuMemoryBudget = vram.budget;
-        const ProcessMemory mem = processMemory(); // 창 있는 실행에서만 (렌더러가 출처일 때)
+        const ProcessMemory mem = processMemory(); // only in windowed runs (when the renderer is a source)
         s.processMemory = mem.resident;
         s.processMemoryPeak = mem.peakResident;
     }

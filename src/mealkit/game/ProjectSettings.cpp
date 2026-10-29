@@ -50,10 +50,10 @@ bool loadProjectFile(const std::string& path, ProjectFile& out, std::string* err
             if (!seenKey) out.header += line + "\n";
             continue;
         }
-        u32 version = 1; // 지금은 버전 1뿐이라 migrate가 없다
+        u32 version = 1; // only version 1 for now, so no migrate
         if (text::readFormatLine(line, text::kProject, path, version)) continue;
         seenKey = true;
-        // "경로 값" 또는 예전 형식 "키=값"
+        // "path value" or the old "key=value" format
         size_t keyEnd = 0;
         while (keyEnd < line.size() && !isBlank(line[keyEnd]) && line[keyEnd] != '=') ++keyEnd;
         size_t valueStart = keyEnd;

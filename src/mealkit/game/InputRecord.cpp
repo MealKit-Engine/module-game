@@ -11,11 +11,11 @@ namespace mealkit::game {
 namespace {
 
 constexpr char kMagic[8] = {'M', 'K', 'I', 'N', 'P', 'U', 'T', '1'};
-constexpr u32 kVersion = 3; // 2: 틱마다 확정 명령, 3: 머리에 로드아웃
-constexpr size_t kStampLength = 16; // 리플레이 이름의 날짜·시각 "YYYY-MM-DD_HH-MM"
+constexpr u32 kVersion = 3; // 2: confirmed commands per tick, 3: loadouts in the header
+constexpr size_t kStampLength = 16; // date/time in replay names "YYYY-MM-DD_HH-MM"
 constexpr size_t kHeaderBytes = 8 + 4 + 4 + 8 + 4 + 4 + 8;
 
-// 어느 CPU에서 써도 같은 바이트가 되도록 직접 리틀 엔디언으로 쓴다
+// Written as explicit little endian so it's the same bytes on any CPU
 void put(std::vector<u8>& out, u64 v, int bytes) {
     for (int i = 0; i < bytes; ++i) out.push_back(static_cast<u8>(v >> (8 * i)));
 }
@@ -65,7 +65,7 @@ void InputRecordWriter::write(const net::TickInputs& inputs, u64 hash) {
     tick.insert(tick.end(), inputs.commands, inputs.commands + inputs.commandBytes);
     put(tick, hash, 8);
     std::fwrite(tick.data(), 1, tick.size(), m_file);
-    std::fflush(m_file); // 버그 리포트가 매치 중에 이 파일을 읽는다 (튕겨도 그 틱까지 남는다)
+    std::fflush(m_file); // bug reports read this file mid-match (even on a crash it remains up to that tick)
 }
 
 void InputRecordWriter::close() {
@@ -157,7 +157,7 @@ std::vector<std::string> listReplays(const std::string& userFolder) {
     const std::string folder = userFolder + "/" + kReplayFolder;
     for (const std::string& name : listFiles(folder, ".rec"))
         if (name != "current.rec") out.push_back(folder + "/" + name);
-    // 이름 "YYYY-MM-DD_HH-MM[-n].rec": 같은 분에 남긴 것은 -2, -3이 붙어 이름 순이 시간 순과 다르다. (날짜·시각, n) 순으로
+    // Names "YYYY-MM-DD_HH-MM[-n].rec": ones saved in the same minute get -2, -3, so name order differs from time order. Sorted by (date/time, n)
     const auto key = [](const std::string& path) {
         const std::string name = fileName(path);
         const u32 n = name.size() > kStampLength + 1 && name[kStampLength] == '-'

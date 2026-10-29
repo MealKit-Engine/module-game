@@ -11,25 +11,25 @@ namespace mealkit::asset {
 class ModelCache;
 }
 
-// 매치 데이터 (씬, 모델, 튜닝): 게임 실행 파일과 에디터가 같은 방법으로 읽고, 같은 콘텐츠 해시를 만든다.
+// Match data (scene, models, tuning): the game executable and editor read it the same way and produce the same content hash.
 namespace mealkit::game {
 
 inline constexpr const char* kDefaultTuningAsset = "assets/game.tuning";
 inline constexpr const char* kViewTuningAsset = "assets/view.tuning";
 
-// 튜닝 파일을 읽는다. path가 비어 있으면 assets/game.tuning. 파일이 없으면 선언의 기본값 그대로 (경고 로그).
-// 읽은 파일 경로를 돌려준다 (없으면 빈 문자열).
+// Reads the tuning file. If path is empty, assets/game.tuning. If the file is missing, the declaration's defaults as is (warning log).
+// Returns the path of the file read (empty string if none).
 std::string loadTuning(const reflect::TypeInfo& type, void* data, const std::string& path = {});
 
-// 화면용 튜닝 파일 (assets/view.tuning, 게임의 ViewTuningType): 콘텐츠 해시에 넣지 않고, 파일이 바뀌면 다시 읽는다.
-// 게임 실행 파일·참가 창·에디터가 하나씩 갖고 매 프레임 poll()한 뒤 GameContext::viewTuningData로 넘긴다.
-// 에디터는 패널에서 고친 값을 바로 쓰고(set), 여러 명 플레이 중에는 참가 창이 읽는 사본 파일을 다시 쓴다.
+// View tuning file (assets/view.tuning, the game's ViewTuningType): not in the content hash, reread when the file changes.
+// The game executable, join windows, and editor each have one, poll() it every frame, and pass it via GameContext::viewTuningData.
+// The editor uses values edited in the panel directly (set), and during multiplayer play rewrites the copy file join windows read.
 class LiveTuning {
 public:
-    // path가 비어 있으면 assets/view.tuning. 파일이 없으면 선언의 기본값.
+    // If path is empty, assets/view.tuning. If the file is missing, the declaration's defaults.
     void open(const reflect::TypeInfo& type, const std::string& path = {});
     void close();
-    // 1초에 몇 번 파일 시각을 보고, 바뀌었으면 다시 읽는다. 다시 읽었으면 true.
+    // Checks the file time a few times per second and rereads if it changed. true if reread.
     bool poll(f64 now);
     reflect::View view() const { return {m_value.type(), m_value.data()}; }
     const std::string& path() const { return m_path; }
@@ -43,38 +43,38 @@ private:
     f64 m_nextCheck = 0.0;
 };
 
-// 매치 데이터에 쓰는 게임 타입 (출시 exe·에디터는 GameModule에서 gameTypes(module), 헤드리스는 게임 클래스에서)
+// Game types used for match data (shipping exe/editor via gameTypes(module) from GameModule, headless from the game class)
 struct GameTypes {
-    const scene::TypeList* objectTypes = nullptr;          // 씬 오브젝트 종류 (MEALKIT_OBJECT)
+    const scene::TypeList* objectTypes = nullptr;          // scene object kinds (MEALKIT_OBJECT)
     const reflect::TypeInfo* tuningType = nullptr;         // assets/game.tuning
-    const reflect::TypeInfo* projectSettingsType = nullptr; // mealkit.project의 game.* 항목 (없으면 nullptr)
-    const reflect::TableList* tables = nullptr;            // 정의 데이터 표 (MEALKIT_TABLE)
+    const reflect::TypeInfo* projectSettingsType = nullptr; // game.* items in mealkit.project (nullptr if none)
+    const reflect::TableList* tables = nullptr;            // definition data tables (MEALKIT_TABLE)
 };
 
 struct MatchDataOptions {
-    std::string scenePath;  // 비어 있으면 프로젝트의 시작 씬 (파일이 없으면 기본 아레나)
-    std::string tuningPath; // 비어 있으면 assets/game.tuning
-    const scene::Scene* scene = nullptr;     // 이미 있는 씬 (에디터: 편집 중인 씬). 주면 scenePath를 읽지 않는다
-    const ProjectFile* project = nullptr;    // 이미 읽은 프로젝트 설정 (에디터). nullptr이면 loadGameProject로 찾는다
+    std::string scenePath;  // project start scene if empty (default arena if the file is missing)
+    std::string tuningPath; // assets/game.tuning if empty
+    const scene::Scene* scene = nullptr;     // existing scene (editor: the scene being edited). If given, scenePath isn't read
+    const ProjectFile* project = nullptr;    // already read project settings (editor). If nullptr, found via loadGameProject
 };
 
-// 한 매치에 필요한 데이터: 출시 exe·헤드리스·에디터 플레이·참가 창이 모두 loadMatchData 하나로 읽는다.
-// 같은 함수가 같은 일곱 가지(씬, 모델, 오브젝트 종류, 튜닝, 프로젝트 설정, 게임 프로젝트 설정, 표)로 콘텐츠 해시를 만들므로
-// 실행 방식이 달라도 피어 해시와 입력 기록이 갈리지 않는다.
+// Data needed for one match: the shipping exe, headless, editor play, and join windows all read it with the single loadMatchData.
+// The same function builds the content hash from the same seven things (scene, models, object kinds, tuning, project settings, game project settings, tables), so
+// peer hashes and input recordings don't diverge across run modes.
 struct MatchData {
     ProjectFile project;
-    reflect::Instance gameProject; // 게임 항목 값 (types.projectSettingsType, 없으면 빈 값)
-    scene::Scene scene;            // 원본 (콘텐츠 해시, GameInstance::start). 시뮬레이션은 scene::flattened로 펼쳐 쓴다
-    reflect::Instance tuning;      // types.tuningType 값
+    reflect::Instance gameProject; // game item values (types.projectSettingsType, empty if none)
+    scene::Scene scene;            // original (content hash, GameInstance::start). The simulation uses it flattened via scene::flattened
+    reflect::Instance tuning;      // types.tuningType value
     u64 contentHash = 0;
-    u64 contentParts[static_cast<u32>(net::ContentPart::Count)] = {}; // 구성별 해시 (접속 거부 이유)
+    u64 contentParts[static_cast<u32>(net::ContentPart::Count)] = {}; // per-component hashes (connection rejection reasons)
 };
 
-// 실패하면(주어진 씬 파일을 읽을 수 없음) 로그를 남기고 false. models는 해시에 쓸 모델 파일을 읽는다 (CPU 데이터만이어도 된다).
+// On failure (the given scene file can't be read), logs and returns false. models reads the model files used for the hash (CPU data only is fine).
 bool loadMatchData(const GameTypes& types, const MatchDataOptions& options, asset::ModelCache& models, MatchData& out);
 
-// 접속할 때 비교하는 해시: 씬(게임 결과에 영향을 주는 부분) + 모델 파일 + 튜닝 값
-// + 프로젝트 설정(엔진 ProjectSettings와 게임 항목 중 MEALKIT_VIEW_FIELD가 아닌 것) + 시뮬레이션 표(kTableView가 아닌 MEALKIT_TABLE).
+// Hash compared on connect: scene (parts affecting game results) + model files + tuning values
+// + project settings (engine ProjectSettings and game items that aren't MEALKIT_VIEW_FIELD) + simulation tables (MEALKIT_TABLE that aren't kTableView).
 u64 contentHash(const scene::Scene& scene, asset::ModelCache& models, const scene::TypeList* gameTypes,
                 const reflect::TypeInfo* tuningType, const void* tuning, reflect::View project = {},
                 reflect::View gameProject = {}, const reflect::TableList* tables = nullptr);

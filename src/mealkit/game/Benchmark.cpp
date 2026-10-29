@@ -24,7 +24,7 @@ f64 mb(u64 bytes) { return static_cast<f64>(bytes) / (1024.0 * 1024.0); }
 
 bool Benchmark::frame(f64 dt, bool running, const FrameSample* sample) {
     if (m_done || !running) return false;
-    if (m_warm < m_config.warmupSeconds) { // 데우는 동안 끝난 주기도 버린다 (주기가 데우기와 겹치면 반쯤 섞인다)
+    if (m_warm < m_config.warmupSeconds) { // periods ending during warmup are also dropped (a period overlapping warmup would be half mixed)
         m_warm += dt;
         return false;
     }
@@ -86,7 +86,7 @@ std::string Benchmark::report(const BenchmarkInfo& info, const BenchmarkResult& 
     std::string out;
     const std::string date =
         std::format("{:%Y-%m-%d %H:%M} UTC", std::chrono::floor<std::chrono::minutes>(std::chrono::system_clock::now()));
-    // 보고서는 개발용이라 영어 (창 제목·perf 로그와 같다)
+    // The report is for developers, so English (same as the window title and perf log)
     appendf(out, "MealKit benchmark (%s)\n\n", date.c_str());
     appendf(out, "game        %s %s (commit %s, simulation %s, %s)\n", info.game.c_str(), info.gameVersion.c_str(),
             info.commit.c_str(), info.simVersion.c_str(), info.determinismGroup.c_str());
@@ -109,7 +109,7 @@ std::string Benchmark::report(const BenchmarkInfo& info, const BenchmarkResult& 
         out += "gpu time    not available (no timestamp queries)\n";
         return out;
     }
-    // GPU 예산 표: 패스 ms와 mealkit.project의 예산. 측정되지 않는 패스(아직 없는 기능)는 0
+    // GPU budget table: pass ms and the budget from mealkit.project. Passes not measured (features not yet present) are 0
     f32 total = 0.0f;
     for (f32 b : info.gpuBudgetMs) total += b;
     appendf(out, "gpu time    %.2f ms frame (budget %.2f ms)\n", r.gpuMs, total);
@@ -122,7 +122,7 @@ std::string Benchmark::report(const BenchmarkInfo& info, const BenchmarkResult& 
         appendf(out, "  %-10s %8.2f %8.2f%s\n", render::gpuPassName(static_cast<render::GpuPass>(i)), ms, budget,
                 ms > budget ? "  OVER" : "");
     }
-    const f64 other = std::max(0.0, r.gpuMs - passes); // 패스 밖 (배리어, 업로드 복사, 프레젠트 준비)
+    const f64 other = std::max(0.0, r.gpuMs - passes); // outside passes (barriers, upload copies, present prep)
     const f32 spare = info.gpuBudgetMs[render::kGpuPassCount];
     appendf(out, "  %-10s %8.2f %8.2f%s\n", "other", other, spare, other > spare ? "  OVER" : "");
     appendf(out, "  %-10s %8.2f %8.2f%s\n", "total", r.gpuMs, total, r.gpuMs > total ? "  OVER" : "");

@@ -25,7 +25,7 @@ std::string loadTuning(const reflect::TypeInfo& type, void* data, const std::str
 void LiveTuning::open(const reflect::TypeInfo& type, const std::string& path) {
     m_value = reflect::Instance(type);
     m_path = path.empty() ? findAsset(kViewTuningAsset) : path;
-    if (m_path.empty()) { // 아직 없다: game.tuning 옆에 생기면 읽는다
+    if (m_path.empty()) { // not there yet: read when it appears next to game.tuning
         const std::string gameTuning = findAsset(kDefaultTuningAsset);
         if (!gameTuning.empty()) m_path = parentDirectory(gameTuning) + "/view.tuning";
     }
@@ -41,8 +41,8 @@ void LiveTuning::close() {
 
 void LiveTuning::reload() {
     m_writeTime = m_path.empty() ? 0 : fileWriteTime(m_path);
-    if (m_writeTime == 0) return; // 파일 없음: 기본값 그대로
-    reflect::Instance fresh(*m_value.type()); // 지운 줄은 기본값으로 돌아가게 새 값에 읽는다
+    if (m_writeTime == 0) return; // no file: defaults as is
+    reflect::Instance fresh(*m_value.type()); // read into a fresh value so deleted lines revert to defaults
     std::string error;
     if (!reflect::loadTextFile(*m_value.type(), fresh.data(), m_path, text::kTuning, &error)) {
         MEALKIT_WARN("Cannot read %s: %s", m_path.c_str(), error.c_str());
@@ -68,10 +68,10 @@ bool loadMatchData(const GameTypes& types, const MatchDataOptions& options, asse
     } else {
         loadGameProject(out.project, types.projectSettingsType, out.gameProject.data());
     }
-    applyTickRate(out.project.settings); // 시간 필드(튜닝·씬·표의 초)를 이 틱레이트로 읽는다
+    applyTickRate(out.project.settings); // time fields (seconds in tuning/scenes/tables) are read with this tick rate
     asset::ModelBudget budgets[asset::kModelKindCount];
     modelBudgets(out.project.settings, budgets);
-    models.setBudgets(budgets); // 넘는 모델은 불러올 때 경고
+    models.setBudgets(budgets); // models over budget warn on load
     models.setProbeLimit(out.project.settings.probeMaxCount);
     if (options.scene) {
         out.scene = *options.scene;
@@ -95,7 +95,7 @@ bool loadMatchData(const GameTypes& types, const MatchDataOptions& options, asse
     out.contentHash = contentHash(out.scene, models, types.objectTypes, types.tuningType, out.tuning.data(),
                                   {&reflect::typeOf<ProjectSettings>(), &out.project.settings},
                                   {types.projectSettingsType, out.gameProject.data()}, types.tables);
-    // 구성별 (어느 것이 다른지 알려 주려고, 합친 해시는 위의 것)
+    // Per component (to report which one differs; the combined hash is the one above)
     u64* parts = out.contentParts;
     parts[static_cast<u32>(net::ContentPart::Scene)] = out.scene.contentHash(types.objectTypes);
     parts[static_cast<u32>(net::ContentPart::Models)] = models.hashModels(out.scene);

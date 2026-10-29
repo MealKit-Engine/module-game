@@ -5,24 +5,24 @@
 #include <string>
 #include <vector>
 
-// 에디터가 플레이 중인 시뮬레이션을 조작하는 창구 (GameInstance::debug()). 구현은 game::Simulation<World>.
+// The editor's window for controlling the running simulation (GameInstance::debug()). Implemented by game::Simulation<World>.
 namespace mealkit::game {
 
 struct Timeline {
-    bool recording = false; // 입력 기록과 스냅샷을 남기는 중 (되감기 가능)
+    bool recording = false; // keeping input recordings and snapshots (rewind possible)
     bool paused = false;
-    bool viewingPast = false; // 기록을 다시 돌려 과거 틱을 보는 중 (계속하면 현재로 돌아간다)
-    u32 first = 0;            // 되감을 수 있는 가장 이른 틱
-    u32 live = 0;             // 실제로 진행한 틱 (다음에 실행할 틱)
-    u32 view = 0;             // 화면에 보이는 틱
-    size_t memoryBytes = 0;   // 스냅샷·입력 기록이 쓰는 메모리
+    bool viewingPast = false; // replaying the recording to view a past tick (continuing returns to the present)
+    u32 first = 0;            // earliest tick that can be rewound to
+    u32 live = 0;             // tick actually advanced to (next tick to run)
+    u32 view = 0;             // tick shown on screen
+    size_t memoryBytes = 0;   // memory used by snapshots/input recording
 };
 
 struct ShadowStatus {
     bool enabled = false;
     bool desynced = false;
-    u32 tick = 0;                  // 처음 갈라진 틱
-    std::vector<std::string> diff; // "경로: 진짜 -> 그림자" (상태 필드). 비어 있으면 물리 상태만 다르다
+    u32 tick = 0;                  // first diverged tick
+    std::vector<std::string> diff; // "path: real -> shadow" (state fields). If empty, only physics state differs
 };
 
 class SimDebug {
@@ -30,11 +30,11 @@ public:
     virtual ~SimDebug() = default;
 
     virtual Timeline timeline() const = 0;
-    virtual void setPaused(bool paused) = 0; // 계속하면 과거를 보던 중이어도 현재 틱으로 돌아간다
-    virtual void stepOnce() = 0;             // 일시정지 중 한 틱 앞으로 (과거를 보는 중이면 기록으로)
-    virtual bool seek(u32 tick) = 0;         // 일시정지 중 기록된 범위의 틱으로 간다
+    virtual void setPaused(bool paused) = 0; // continuing returns to the current tick even while viewing the past
+    virtual void stepOnce() = 0;             // one tick forward while paused (from the recording if viewing the past)
+    virtual bool seek(u32 tick) = 0;         // goes to a tick in the recorded range while paused
     virtual const ShadowStatus& shadow() const = 0;
-    // 되감기로 다시 돌린 결과가 기록과 다를 때의 설명 (선언하지 않은 상태, 결정론 위반). 없으면 빈 문자열
+    // Description when the result rerun by rewind differs from the recording (undeclared state, determinism violation). Empty string if none
     virtual const std::string& replayError() const = 0;
 };
 

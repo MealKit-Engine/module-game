@@ -18,20 +18,20 @@
 #include <type_traits>
 #include <utility>
 
-// 결정론 시뮬레이션 실행기: 게임의 World를 고정 틱으로 돌린다 (app/GameSession이 하나 갖는다).
-//   - 확정된 틱만 실행하고 로컬 입력을 보낸다 (락스텝 순서: canExecute → inputs → step → tickExecuted → submitLocalInput)
-//   - 화면 보간용 직전 상태
-//   - 그림자 시뮬레이션 (PlayOptions::shadow): 같은 입력으로 World를 하나 더 돌려 매 틱 해시를 비교한다.
-//     다르면 멈추고 처음 갈라진 틱과 상태 필드 차이를 남긴다 (초기화 안 된 값, 전역 상태, 포인터 순서, 실제 시간 읽기를 잡는다)
-//   - 기록 (PlayOptions::record): 틱 입력과 해시, 주기적 스냅샷 → 일시정지, 한 틱 진행, 되감기
-//   - 해시 로그·입력 기록 파일 (PlayOptions::hashLogPath, recordInputsPath): 빌드·플랫폼 사이 비교 (game/InputRecord.h)
-//   - 디싱크 덤프 (PlayOptions::desyncDumpDir): 여러 명 매치에서 스냅샷을 kKeepDesyncSnapshots개 남기고, 세션이 디싱크를 알리면
-//     갈라진 틱 앞의 스냅샷에서 그 틱까지 다시 돌려 상태를 파일로 쓴다 (game/DesyncDump.h). 지금 상태는 그대로 둔다
-//   - 중간 참가·재접속: 호스트는 세션이 원하면 틱 사이에 스냅샷 바이트를 준다(provideSnapshot). 들어온 쪽은 첫 update에서
-//     스냅샷을 불러 그 틱부터 돌리고, 따라잡는 동안(catchingUp)은 한 프레임에 kJoinCatchUpTicks까지 돌린다
+// Deterministic simulation runner: runs the game's World at a fixed tick (app/GameSession has one).
+//   - runs only confirmed ticks and sends local input (lockstep order: canExecute → inputs → step → tickExecuted → submitLocalInput)
+//   - previous state for view interpolation
+//   - shadow simulation (PlayOptions::shadow): runs one more World with the same inputs and compares hashes every tick.
+//     On mismatch, pauses and records the first diverged tick and state field differences (catches uninitialized values, global state, pointer order, reading real time)
+//   - recording (PlayOptions::record): tick inputs and hashes, periodic snapshots → pause, single tick step, rewind
+//   - hash log/input recording files (PlayOptions::hashLogPath, recordInputsPath): comparison across builds/platforms (game/InputRecord.h)
+//   - desync dump (PlayOptions::desyncDumpDir): keeps kKeepDesyncSnapshots snapshots in multiplayer matches; when the session reports a desync,
+//     reruns from the snapshot before the diverged tick up to that tick and writes the state to a file (game/DesyncDump.h). The current state is left as is
+//   - late join/reconnect: the host provides snapshot bytes between ticks when the session wants them (provideSnapshot). The joiner loads the snapshot
+//     on its first update and runs from that tick, running up to kJoinCatchUpTicks per frame while catching up (catchingUp)
 //
-// World 약속: state(MEALKIT_STRUCT, state.tick), physics, events, step(const net::TickInputs&), hash().
-// 매치를 시작할 때 reset(World&, 물리 스레드 수)으로 진짜·그림자 World를 똑같이 초기화한다.
+// World contract: state (MEALKIT_STRUCT, state.tick), physics, events, step(const net::TickInputs&), hash().
+// When a match starts, reset(World&, physics thread count) initializes the real and shadow Worlds identically.
 namespace mealkit::game {
 
 template <class World>
@@ -41,11 +41,11 @@ public:
     static_assert(!reflect::hasStringField<State>(),
                   "simulation state must not contain std::string (keep names in tuning/scene data, use ids in state)");
 
-    static constexpr u32 kSnapshotInterval = 150; // 틱 (30Hz에서 5초)
-    static constexpr u32 kKeepSnapshots = 40;     // 약 3분 20초를 되감을 수 있다
-    static constexpr u32 kKeepDesyncSnapshots = 3; // 디싱크 덤프용 (기록·되감기가 꺼진 여러 명 매치): 호스트가 알아채는 지연(256틱 안)을 덮는다
-    static constexpr int kCatchUpTicks = 8;       // 한 프레임에 따라잡을 최대 틱
-    static constexpr int kJoinCatchUpTicks = 240; // 중간 참가 뒤 따라잡을 때 한 프레임에 돌릴 최대 틱
+    static constexpr u32 kSnapshotInterval = 150; // ticks (5 seconds at 30Hz)
+    static constexpr u32 kKeepSnapshots = 40;     // about 3 min 20 s can be rewound
+    static constexpr u32 kKeepDesyncSnapshots = 3; // for desync dumps (multiplayer matches with recording/rewind off): covers the host's detection delay (within 256 ticks)
+    static constexpr int kCatchUpTicks = 8;       // max ticks to catch up per frame
+    static constexpr int kJoinCatchUpTicks = 240; // max ticks to run per frame when catching up after a late join
 
     template <class Reset>
     void start(const PlayOptions& options, f32 tickDt, Reset&& reset) {
@@ -57,7 +57,7 @@ public:
         m_shadowStatus = {};
         if (options.shadow) {
             m_shadow = std::make_unique<World>();
-            reset(*m_shadow, 1u); // 스레드 수는 결과에 영향이 없다
+            reset(*m_shadow, 1u); // the thread count doesn't affect results
             m_shadowStatus.enabled = true;
         }
         m_previous = m_world->state;
@@ -79,7 +79,7 @@ public:
         if (!options.hashLogPath.empty()) m_hashLog.open(options.hashLogPath);
     }
 
-    // 매치를 끝낸다 (World를 버린다, 파일을 닫는다). 다음 start로 새 매치
+    // Ends the match (discards the World, closes files). The next start begins a new match
     void stop() {
         m_world.reset();
         m_shadow.reset();
@@ -99,14 +99,14 @@ public:
     World& world() { return *m_world; }
     const World& world() const { return *m_world; }
     const State& previous() const { return m_previous; }
-    // 직전 틱과 이번 틱 사이 보간 비율 (멈춰 있으면 1)
+    // Interpolation fraction between the previous tick and this tick (1 when paused)
     f32 alpha() const {
         if (!m_started || m_paused) return 1.0f;
         return std::clamp(static_cast<f32>(m_accumulator / m_tickDt), 0.0f, 1.0f);
     }
 
-    // 보냈지만 아직 실행되지 않은 내 입력 (목표 틱 순): f(목표 틱, const net::PlayerInput&).
-    // 화면에서만 내 캐릭터를 미리 움직여 그릴 때 쓴다 (입력 지연을 가린다, 시뮬레이션은 그대로)
+    // My inputs sent but not yet executed (in target tick order): f(target tick, const net::PlayerInput&).
+    // Used to draw my character moved ahead on screen only (hides input delay; the simulation is unchanged)
     template <class F>
     void forEachPendingInput(F&& f) const {
         for (const PendingInput& p : m_pending)
@@ -125,14 +125,14 @@ public:
         return ms;
     }
 
-    // 매 프레임. sample(tick) → 이번 틱에 보낼 로컬 입력(net::PlayerInput), onTick(world) → 이번 틱 이벤트를 화면 쪽으로.
+    // Every frame. sample(tick) → local input to send this tick (net::PlayerInput), onTick(world) → this tick's events to the view side.
     template <class Sample, class OnTick>
     void update(net::LockstepSession& session, f64 dt, Sample&& sample, OnTick&& onTick) {
         if (!m_started || m_finished) return;
         MEALKIT_ZONE("Simulation");
         const f64 simStart = nowSeconds();
         if (m_nextTick == 0 && session.joinTick() > 0 && !joinMatch(session)) return;
-        if (session.catchingUp() && !m_paused) { // 중간 참가: 확정된 틱을 실제 시간보다 빨리
+        if (session.catchingUp() && !m_paused) { // late join: confirmed ticks faster than real time
             int budget = kJoinCatchUpTicks;
             while (budget-- > 0 && session.canExecute(m_nextTick) && !m_finished && session.catchingUp())
                 executeTick(session, sample, onTick);
@@ -151,11 +151,11 @@ public:
                 executeTick(session, sample, onTick);
                 m_accumulator -= m_tickDt;
             }
-            // 입력을 기다리며 멈춘 동안 시간 빚이 무한히 쌓이지 않게 한다
+            // Keeps time debt from piling up forever while stalled waiting for input
             m_accumulator = std::min(m_accumulator, static_cast<f64>(m_tickDt) * kCatchUpTicks);
         }
         if (session.desynced() && !m_desyncDumped && !m_options.desyncDumpDir.empty()) dumpDesync(session);
-        if (session.snapshotWanted() && !m_viewingPast) { // 호스트: 누가 들어온다 (지금 틱 사이의 상태)
+        if (session.snapshotWanted() && !m_viewingPast) { // host: someone is joining (state between the current ticks)
             WorldSnapshot snapshot;
             saveSnapshot(*m_world, snapshot);
             std::vector<u8> bytes;
@@ -165,7 +165,7 @@ public:
         m_simSeconds += nowSeconds() - simStart;
     }
 
-    // 튜닝 바꾸기 같은 매치 중 변경: 진짜·그림자 World에 똑같이 하고, 기록은 지금부터 다시 시작한다 (예전 입력으로는 재현되지 않으므로)
+    // Mid-match changes like tuning changes: applied identically to the real and shadow Worlds, and recording restarts from now (old inputs can't reproduce it)
     template <class F>
     void modifyWorlds(F&& f) {
         if (!m_started) return;
@@ -211,7 +211,7 @@ public:
             returnToLive();
             return true;
         }
-        if (!m_viewingPast) { // 지금 상태를 남겨 두고 과거로
+        if (!m_viewingPast) { // keep the current state and go to the past
             saveSnapshot(*m_world, m_live);
             m_livePrevious = m_previous;
             m_viewingPast = true;
@@ -226,7 +226,7 @@ public:
             MEALKIT_ERROR("Rewind: snapshot of tick %u does not restore to the saved hash (undeclared state?)",
                           from->tick);
         }
-        // 기록된 입력으로 다시 돌리며 기록된 해시와 비교한다
+        // Rerun with the recorded inputs and compare with the recorded hashes
         for (u32 t = from->tick; t < tick; ++t) {
             m_previous = m_world->state;
             m_world->step(m_inputs[t - m_inputBase]);
@@ -251,29 +251,29 @@ private:
     void executeTick(net::LockstepSession& session, Sample& sample, OnTick& onTick) {
         const net::TickInputs& inputs = session.inputs(m_nextTick);
         if (m_nextTick == 0 && !m_history && !session.isOffline() && !m_options.desyncDumpDir.empty()) {
-            m_history = true; // 디싱크 덤프용 스냅샷 (매치 값과 여러 명인지는 세션이 Running이 된 뒤에 안다)
+            m_history = true; // snapshots for desync dumps (match values and whether it's multiplayer are known after the session becomes Running)
             clearHistory();
         }
         m_previous = m_world->state;
         stepWorld(*m_world, inputs, m_nextTick);
         const u64 hash = m_world->hash();
         session.tickExecuted(m_nextTick, hash);
-        if (m_nextTick == 0 && !m_options.recordInputsPath.empty()) // 매치 값은 세션이 Running이 된 뒤에 확정된다
+        if (m_nextTick == 0 && !m_options.recordInputsPath.empty()) // match values are confirmed after the session becomes Running
             m_recordWriter.open(m_options.recordInputsPath, matchInfo(session), session.contentHash());
         m_recordWriter.write(inputs, hash);
         m_hashLog.write(m_nextTick, hash);
 
         if (m_shadow && !m_shadowStatus.desynced) {
-            m_shadow->step(inputs); // --desync-test의 바꾸기는 진짜 World만 (그림자가 잡는다)
+            m_shadow->step(inputs); // the --desync-test perturbation applies only to the real World (the shadow catches it)
             if (m_shadow->hash() != hash) reportShadowDesync();
         }
         if (m_history) record(inputs, hash);
-        onTick(*m_world); // 틱 이벤트는 다음 step()에서 지워지므로 틱마다 바로 화면 쪽으로 옮긴다
+        onTick(*m_world); // tick events are cleared by the next step(), so they're moved to the view side right away every tick
 
         const net::PlayerInput local = sample(m_nextTick);
         const u32 target = m_nextTick + session.inputDelay();
         session.submitLocalInput(target, local);
-        while (!m_pending.empty() && m_pending.front().tick <= m_nextTick) m_pending.pop_front(); // 실행한 틱
+        while (!m_pending.empty() && m_pending.front().tick <= m_nextTick) m_pending.pop_front(); // executed ticks
         if (m_pending.empty() || m_pending.back().tick < target) m_pending.push_back({target, local});
         if (m_options.capture && !m_captureDone && m_nextTick >= m_options.captureTick)
             m_captureDue = m_captureDone = true;
@@ -295,7 +295,7 @@ private:
         MEALKIT_ERROR("Shadow simulation diverged at tick %u (%zu state field(s) differ%s)", m_nextTick,
                       m_shadowStatus.diff.size(), m_shadowStatus.diff.empty() ? ", physics only" : "");
         for (const std::string& line : m_shadowStatus.diff) MEALKIT_ERROR("  %s", line.c_str());
-        m_paused = true; // 갈라진 틱에서 멈춰 상태를 볼 수 있게
+        m_paused = true; // pause at the diverged tick so the state can be inspected
     }
 
     void record(const net::TickInputs& inputs, u64 hash) {
@@ -309,7 +309,7 @@ private:
         saveSnapshot(*m_world, m_snapshots.back());
         if (m_snapshots.size() > (m_options.record ? kKeepSnapshots : kKeepDesyncSnapshots)) {
             m_snapshots.pop_front();
-            const u32 first = m_snapshots.front().tick; // 이보다 앞의 입력은 더 이상 쓸 일이 없다
+            const u32 first = m_snapshots.front().tick; // inputs before this are no longer needed
             while (m_inputBase < first && !m_inputs.empty()) {
                 m_inputs.pop_front();
                 m_hashes.pop_front();
@@ -332,8 +332,8 @@ private:
         world.step(inputs);
     }
 
-    // 중간 참가: 호스트가 보낸 스냅샷으로 World를 바꾸고 그 틱부터 돌린다 (start의 reset은 정적 데이터만 맞춘다).
-    // 같은 id에 다른 바디가 있을 수 있어 물리 바디를 모두 지우고 스냅샷의 것을 만든다. 실패하면 false (매치를 돌리지 않는다)
+    // Late join: replace the World with the snapshot the host sent and run from that tick (start's reset only sets up static data).
+    // The same id may have a different body, so all physics bodies are deleted and the snapshot's are created. false on failure (the match isn't run)
     bool joinMatch(net::LockstepSession& session) {
         std::vector<u8> bytes;
         if (!session.takeJoinSnapshot(bytes)) return m_joinFailed ? false : true;
@@ -353,17 +353,17 @@ private:
         m_nextTick = snapshot.tick;
         m_previous = m_world->state;
         m_pending.clear();
-        if (!session.isOffline() && !m_options.desyncDumpDir.empty()) m_history = true; // 디싱크 덤프용 (0틱에서 켜지 못했다)
+        if (!session.isOffline() && !m_options.desyncDumpDir.empty()) m_history = true; // for desync dumps (couldn't be turned on at tick 0)
         clearHistory();
         m_inputBase = m_nextTick;
         MEALKIT_INFO("Joined the match at tick %u (%zu bytes)", m_nextTick, bytes.size());
         return true;
     }
 
-    // 세션이 알린 디싱크 틱의 상태를 파일로 (한 번). 그 틱 앞의 스냅샷을 불러 그 틱까지 다시 돌린 뒤 지금 상태로 되돌린다
+    // Writes the state of the desync tick reported by the session to a file (once). Loads the snapshot before that tick, reruns to that tick, then restores the current state
     void dumpDesync(const net::LockstepSession& session) {
         const u32 tick = session.desyncTick();
-        if (tick >= m_nextTick) return; // 아직 실행하지 않은 틱 (다음 프레임에)
+        if (tick >= m_nextTick) return; // a tick not yet executed (next frame)
         m_desyncDumped = true;
         DesyncDumpHeader h{session.localPlayer(), tick, session.seed(), session.contentHash(), {}};
         std::vector<std::pair<u32, u64>> hashes;
@@ -373,7 +373,7 @@ private:
         for (const WorldSnapshot& s : m_snapshots)
             if (s.tick <= tick) from = &s;
         const std::string path = desyncDumpPath(m_options.desyncDumpDir, h.seed, tick, h.player);
-        if (!m_history || !from || tick < m_inputBase) { // 남은 기록이 그 틱을 덮지 못한다: 지금 상태를 쓴다
+        if (!m_history || !from || tick < m_inputBase) { // the remaining recording doesn't cover that tick: write the current state
             h.note = "no snapshot before the desync tick; this is the state at tick " + std::to_string(m_nextTick - 1);
             writeDesyncDump(path, h, *m_world, hashes);
             MEALKIT_ERROR("Desync dump (current state only): %s", path.c_str());
@@ -424,13 +424,13 @@ private:
     std::string m_replayError;
 
     std::deque<WorldSnapshot> m_snapshots;
-    std::deque<net::TickInputs> m_inputs; // m_inputBase 틱부터
+    std::deque<net::TickInputs> m_inputs; // from tick m_inputBase
     std::deque<u64> m_hashes;
     u32 m_inputBase = 0;
-    WorldSnapshot m_live; // 과거를 보는 동안 현재 상태
+    WorldSnapshot m_live; // current state while viewing the past
     State m_livePrevious;
 
-    bool m_history = false;      // 입력·해시·스냅샷을 남긴다 (PlayOptions::record, 또는 디싱크 덤프)
+    bool m_history = false;      // keeps inputs/hashes/snapshots (PlayOptions::record, or desync dumps)
     bool m_desyncDumped = false;
     bool m_joinFailed = false;
     InputRecordWriter m_recordWriter;
@@ -440,7 +440,7 @@ private:
         u32 tick = 0;
         net::PlayerInput input;
     };
-    std::deque<PendingInput> m_pending; // 보냈지만 아직 실행하지 않은 내 입력
+    std::deque<PendingInput> m_pending; // my inputs sent but not yet executed
 };
 
 } // namespace mealkit::game

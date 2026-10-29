@@ -15,35 +15,35 @@ class Engine;
 }
 } // namespace mealkit
 
-// 성능 숫자 모으기 (docs/CODING_MODEL.md "성능 숫자 모으기와 보여 주기"). 측정은 각 하위 시스템의 stats()가 하고,
-// 이것은 보고 주기마다 평균을 내 한 묶음(FrameSample)과 글자로 만든다. 창 제목·F1 오버레이·perf 로그·에디터 상태 표시줄이 같이 쓴다.
+// Collecting performance numbers (docs/CODING_MODEL.md "Collecting and showing performance numbers"). Measurement is done by each subsystem's stats(),
+// and this averages per report period into one batch (FrameSample) and text. Shared by the window title, F1 overlay, perf log, and editor status bar.
 //   game::FrameStats perf;
 //   if (perf.update(dt, {&renderer, &session, &audio, &game})) window.setTitle(perf.line().c_str());
-// 함수 안 시간 재기는 Tracy 마커 MEALKIT_ZONE (mealkit/core/Profile.h).
+// For timing inside functions, use the Tracy marker MEALKIT_ZONE (mealkit/core/Profile.h).
 namespace mealkit::game {
 
 class GameInstance;
 
-// 출처: 없는 것(nullptr)은 그 항목을 비운다 (편집 모드의 세션, 헤드리스의 렌더러 등)
+// Sources: missing ones (nullptr) leave that item empty (session in edit mode, renderer in headless, etc.)
 struct FrameSources {
     const render::Renderer* renderer = nullptr;
     const net::LockstepSession* session = nullptr;
     const audio::Engine* audio = nullptr;
-    GameInstance* game = nullptr; // takeSimMsPerTick은 읽으면 평균을 비우므로 FrameStats만 부른다
+    GameInstance* game = nullptr; // takeSimMsPerTick clears the average when read, so only FrameStats calls it
 };
 
-// 보고 주기 하나의 값
+// Values for one report period
 struct FrameSample {
-    f64 seconds = 0.0; // 이 묶음이 덮는 시간
+    f64 seconds = 0.0; // time this batch covers
     u32 frames = 0;
-    f64 frameMs = 0.0;      // 평균 프레임 시간
-    f64 worstFrameMs = 0.0; // 주기 안에서 가장 긴 프레임
-    f64 p99FrameMs = 0.0;   // 1% 최악 프레임: 이보다 긴 프레임이 1% (frameMsPercentile 99)
+    f64 frameMs = 0.0;      // average frame time
+    f64 worstFrameMs = 0.0; // longest frame within the period
+    f64 p99FrameMs = 0.0;   // 1% worst frames: 1% of frames are longer than this (frameMsPercentile 99)
     f64 fps = 0.0;
 
     bool hasGame = false;
     f64 simMsPerTick = 0.0;
-    u32 tick = 0; // 다음에 실행할 틱
+    u32 tick = 0; // next tick to run
 
     bool hasSession = false;
     u32 localPlayer = 0, playerCount = 0;
@@ -54,36 +54,36 @@ struct FrameSample {
     bool hasRenderer = false;
     u32 drawCalls = 0, instances = 0, culled = 0;
     bool vsync = false;
-    bool hasGpuTime = false; // 타임스탬프 쿼리 결과가 있다 (render::RenderStats::gpuValid)
-    f64 gpuMs = 0.0;         // 평균 GPU 프레임 시간
+    bool hasGpuTime = false; // there are timestamp query results (render::RenderStats::gpuValid)
+    f64 gpuMs = 0.0;         // average GPU frame time
     f64 gpuPassMs[render::kGpuPassCount] = {};
-    u64 gpuMemoryUsed = 0, gpuMemoryBudget = 0; // 바이트 (모르면 0)
+    u64 gpuMemoryUsed = 0, gpuMemoryBudget = 0; // bytes (0 if unknown)
 
-    u64 processMemory = 0, processMemoryPeak = 0; // 바이트 (platform processMemory, 렌더러가 있을 때)
+    u64 processMemory = 0, processMemoryPeak = 0; // bytes (platform processMemory, when there is a renderer)
 
     bool hasAudio = false;
     u32 realVoices = 0, virtualVoices = 0;
     f64 audioMs = 0.0;
 };
 
-// 프레임 시간(초) 목록의 백분위수 (ms). 목록을 정렬한다. 비면 0
+// Percentile (ms) of a list of frame times (seconds). Sorts the list. 0 if empty
 f64 frameMsPercentile(std::vector<f64>& frameSeconds, f64 percent);
 
 class FrameStats {
 public:
-    static constexpr f64 kDefaultPeriod = 0.25; // 초 (창 제목 4Hz)
+    static constexpr f64 kDefaultPeriod = 0.25; // seconds (window title at 4Hz)
 
     explicit FrameStats(f64 period = kDefaultPeriod) : m_period(period) {}
 
-    // 매 프레임 한 번 (dt는 초). 보고 주기가 끝난 프레임에 출처에서 값을 모아 sample()을 바꾸고 true.
+    // Once per frame (dt in seconds). On frames where a report period ends, collects values from sources, updates sample(), and returns true.
     bool update(f64 dt, const FrameSources& from);
-    // 마지막으로 끝난 주기 (첫 주기 전에는 모두 0)
+    // The last finished period (all 0 before the first period)
     const FrameSample& sample() const { return m_sample; }
-    // "60 fps 16.67 ms (worst 18.2) | sim 0.42 ms/tick | ..." (창 제목, 로그). 성능 숫자는 개발용이라 영어 그대로
+    // "60 fps 16.67 ms (worst 18.2) | sim 0.42 ms/tick | ..." (window title, log). Performance numbers are for developers, so English as is
     std::string line() const;
-    // line()의 항목을 한 줄씩 (F1 오버레이)
+    // Items of line() one per line (F1 overlay)
     std::string lines() const;
-    // sample()을 JSON 객체 하나로 (라이브 연결 상태 스트림의 "stats" 주제, mealkit/live/Server.h). 없는 출처의 묶음은 뺀다
+    // sample() as one JSON object (the "stats" topic of the live connection status stream, mealkit/live/Server.h). Batches from missing sources are omitted
     std::string json() const;
 
 private:

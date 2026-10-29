@@ -68,7 +68,7 @@ void printGameUsage(const char* name, bool headless) {
 }
 
 bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window) {
-    WindowOptions ignored; // 헤드리스: 창 옵션은 읽고 버린다
+    WindowOptions ignored; // headless: window options are read and discarded
     WindowOptions& w = window ? *window : ignored;
     const bool headless = window == nullptr;
     for (int i = 1; i < argc; ++i) {
@@ -81,7 +81,7 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
         auto hasValue = [&] { return i + 1 < argc && argv[i + 1][0] != '-'; };
         auto u32Of = [](const char* v) { return static_cast<u32>(std::atoi(v)); };
         const char* v = nullptr;
-        // ---- 매치
+        // ---- Match
         if (a == "--host") {
             o.mode = MatchOptions::Mode::Host;
             if (hasValue()) o.port = static_cast<u16>(std::atoi(argv[++i]));
@@ -89,7 +89,7 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
             o.mode = MatchOptions::Mode::Join;
             o.joinAddress = v;
         } else if (a == "--steam" && !headless) o.mode = MatchOptions::Mode::SteamHost;
-        else if ((a == "--steam-join" || a == "+connect_lobby") && !headless && next(v)) { // +connect_lobby: Steam 초대 수락
+        else if ((a == "--steam-join" || a == "+connect_lobby") && !headless && next(v)) { // +connect_lobby: accepting a Steam invite
             o.mode = MatchOptions::Mode::SteamJoin;
             o.steamLobby = std::strtoull(v, nullptr, 10);
         } else if (a == "--local") o.loopbackOnly = true;
@@ -114,8 +114,8 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
         else if (a == "--net-lag" && next(v)) o.netLagMs = static_cast<f32>(std::atof(v));
         else if (a == "--net-jitter" && next(v)) o.netJitterMs = static_cast<f32>(std::atof(v));
         else if (a == "--net-loss" && next(v)) o.netLossPercent = static_cast<f32>(std::atof(v));
-        // ---- 창
-        else if (a == "--headless") continue; // 출시 exe의 main이 이미 나눴다
+        // ---- Window
+        else if (a == "--headless") continue; // the shipping exe's main already split it off
         else if (a == "--vsync" && next(v)) w.vsync = std::atoi(v) != 0, w.windowGiven = true;
         else if (a == "--render-scale" && next(v)) w.renderScale = static_cast<f32>(std::atof(v));
         else if (a == "--fps" && next(v)) w.fpsCap = std::atof(v), w.windowGiven = true;
@@ -130,7 +130,7 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
             w.capturePath = argv[++i];
             if (i + 1 < argc && argv[i + 1][0] != '-') w.captureTick = u32Of(argv[++i]);
         } else if (a == "--frames" && next(v)) w.frames = u32Of(v);
-        else if (a == "--ui-press" && next(v)) { // "프레임:노드,프레임:노드"
+        else if (a == "--ui-press" && next(v)) { // "frame:node,frame:node"
             const std::string list = v;
             size_t at = 0;
             while (at < list.size()) {
@@ -151,7 +151,7 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
         else if (a == "--gpu-capture") w.gpuCapture = true;
         else if (a == "--bug-report-at" && next(v)) w.bugReportAt = u32Of(v);
         else if (a == "--gpu-capture-at" && next(v)) w.gpuCapture = true, w.gpuCaptureAt = u32Of(v);
-        else if (a == "--benchmark") { // [초]
+        else if (a == "--benchmark") { // [seconds]
             w.benchmarkSeconds = 30.0;
             if (i + 1 < argc && argv[i + 1][0] != '-') w.benchmarkSeconds = std::max(1.0, std::atof(argv[++i]));
         } else if (a == "--benchmark-out" && next(v)) w.benchmarkPath = v;

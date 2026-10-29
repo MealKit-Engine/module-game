@@ -67,7 +67,7 @@ std::string writeBugReport(const std::string& userFolder, const BugReportInfo& i
         MEALKIT_ERROR("Cannot write the bug report %s", temp.c_str());
         return {};
     }
-    // 이름은 쓴 시각 (리플레이 이름과 같은 방식)
+    // Named by the time written (same scheme as replay names)
     std::string stamp = formatFileTime(fileWriteTime(temp), true);
     for (char& c : stamp)
         if (c == ' ') c = '_';

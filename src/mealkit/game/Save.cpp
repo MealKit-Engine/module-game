@@ -24,7 +24,7 @@ std::string savePath(const std::string& userFolder, const std::string& name) {
 }
 
 bool writeSave(const reflect::TypeInfo& type, const void* data, const std::string& userFolder, const std::string& name, u32 version) {
-    if (userFolder.empty()) return false; // 자동 실행: 저장하지 않는다
+    if (userFolder.empty()) return false; // automated runs: no saving
     const std::string path = savePath(userFolder, name);
     createDirectories(parentDirectory(path));
     reflect::TextFields fields;
@@ -65,7 +65,7 @@ SaveInfo readSave(const reflect::TypeInfo& type, void* data, const std::string& 
     if (info.version > version)
         MEALKIT_WARN("Save %s is version %u, newer than this game (%u) - unknown fields are dropped", info.path.c_str(), info.version, version);
     if (migrate && info.version < version) migrate(info.version, fields);
-    reflect::fromText(type, data, fields, &info.warnings); // 모르는 필드는 버린다, 없는 필드는 기본값
+    reflect::fromText(type, data, fields, &info.warnings); // unknown fields are dropped, missing fields get defaults
     if (!info.warnings.empty()) MEALKIT_INFO("Save %s: %s", info.path.c_str(), info.warnings.c_str());
     return info;
 }
