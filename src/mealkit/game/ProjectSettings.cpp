@@ -74,7 +74,7 @@ bool loadProjectFile(const std::string& path, ProjectFile& out, std::string* err
 
 bool saveProjectFile(const std::string& path, const ProjectFile& project) {
     std::string text = project.header.empty()
-                           ? "# MealKit project (경로 값). 에디터 [파일] > [프로젝트 설정]에서 고친다. 게임 항목은 game.\n"
+                           ? "# MealKit project (path value). Edit in the editor via [File] > [Project Settings]. Game items use game.\n"
                            : project.header;
     text += text::formatLine(text::kProject) + "\n";
     reflect::TextFields fields;
