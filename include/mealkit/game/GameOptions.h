@@ -36,6 +36,8 @@ struct MatchOptions {
     std::string scenePath, tuningPath;
     std::string hashLogPath, recordInputsPath;
     std::string replayInputsPath; // headless --replay-inputs (hash comparison), windowed --replay (viewing)
+    std::string testPath;         // headless --test: scenario file (game/Scenario.h)
+    bool updateExpected = false;  // --update-expected: rewrite the scenario's == values with the results
 };
 using HeadlessOptions = MatchOptions; // old name (defaults of game headless classes)
 
