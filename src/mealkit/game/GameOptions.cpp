@@ -150,6 +150,7 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
         else if (a == "--lang" && next(v)) w.language = v;
         else if (a == "--gpu-capture") w.gpuCapture = true;
         else if (a == "--bug-report-at" && next(v)) w.bugReportAt = u32Of(v);
+        else if (a == "--crash-at" && next(v)) w.crashAt = u32Of(v);
         else if (a == "--gpu-capture-at" && next(v)) w.gpuCapture = true, w.gpuCaptureAt = u32Of(v);
         else if (a == "--benchmark") { // [seconds]
             w.benchmarkSeconds = 30.0;

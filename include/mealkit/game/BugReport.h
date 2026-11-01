@@ -16,6 +16,7 @@
 namespace mealkit::game {
 
 inline constexpr const char* kBugReportFolder = "bugreports";
+inline constexpr const char* kCrashReportFolder = "crash";
 
 struct BugReportInfo {
     BuildInfo build;
@@ -30,7 +31,17 @@ struct BugReportInfo {
 std::string writeBugReport(const std::string& userFolder, const BugReportInfo& info, const std::string& recordingPath,
                            const std::string& screenshotPath);
 
-// Extracts replay.rec from the zip to outFolder/replay.rec. info is the info.txt contents
+// Crash reports: the same zip, left by a crash instead of F9, in the user folder crash/<YYYY-MM-DD_HH-MM>.zip.
+// At the crash, the platform handler (platform/System.h installCrashHandler) writes crash/pending/crash.txt + crash.dmp (minidump),
+// and the hook adds info.txt, log.txt and recording.txt (path of the input recording, which is flushed every tick).
+// The next run bundles pending/ into the zip (collectCrashReport) before replays/current.rec is kept or overwritten.
+// Arms crash reports for this run. info's tick/players are updated each frame with updateCrashReport
+void armCrashReport(const std::string& userFolder, const BugReportInfo& info, const std::string& recordingPath);
+void updateCrashReport(u32 tick, u32 players, u32 localPlayer);
+// Bundles a crash left by an earlier run into a zip. Path of the zip, empty string if there was none
+std::string collectCrashReport(const std::string& userFolder);
+
+// Extracts replay.rec from the zip (bug report or crash report) to outFolder/replay.rec. info is the info.txt contents
 bool extractBugReport(const std::string& zipPath, const std::string& outFolder, std::string& recordingPath,
                       std::string& info, std::string& error);
 

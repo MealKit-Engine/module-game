@@ -59,6 +59,7 @@ struct WindowOptions {
     std::string language;      // game text language (language in mealkit.project if empty)
     bool gpuCapture = false;   // --gpu-capture: load RenderDoc/PIX and capture the next frame with F11 (dev builds)
     u32 bugReportAt = 0;       // --bug-report-at <frame>: leave a bug report as if F9 were pressed on that frame (automated tests, no note)
+    u32 crashAt = 0;           // --crash-at <frame>: crash on purpose on that frame (crash report tests, game/BugReport.h)
     u32 gpuCaptureAt = 0;      // --gpu-capture-at <frame>: capture that frame (automated tests, doesn't open the RenderDoc window)
     f64 benchmarkSeconds = 0.0; // --benchmark [seconds]: benchmark mode if not 0 (mealkit/game/Benchmark.h)
     std::string benchmarkPath = "benchmark.txt";

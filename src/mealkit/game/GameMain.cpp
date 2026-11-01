@@ -37,6 +37,7 @@
 #include "mealkit/net/Socket.h"
 #include "mealkit/online/Online.h"
 #include "mealkit/platform/Paths.h"
+#include "mealkit/platform/Process.h"
 #include "mealkit/platform/System.h"
 #include "mealkit/platform/Window.h"
 #include "mealkit/render/DrawList.h"
@@ -303,11 +304,28 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     const bool watching = !opt.replayInputsPath.empty();
     const bool keepingReplays = gameOptions.recordInputsPath.empty() && !watching && !userFolderPath.empty() &&
                                 project.settings.keepReplays > 0;
+    // Crash reports (game/BugReport.h): a crash left by the previous run is bundled first, before current.rec is kept or reused
+    const bool crashReports = project.settings.bugReports && (!automated || win.crashAt) && run.playerFiles;
+    if (crashReports) {
+        const std::string crashZip = collectCrashReport(userFolder(project.settings));
+        if (!crashZip.empty() && !automated &&
+            askDialog("Crash report",
+                      ("The game crashed last time. A crash report was saved:\n" + crashZip + "\n\nOpen the folder?").c_str()))
+            openInExplorer(parentDirectory(crashZip));
+    }
     if (keepingReplays) {
         keepReplay(userFolderPath, project.settings.keepReplays); // recording left over from a previous run that ended mid-match
         gameOptions.recordInputsPath = replayRecordingPath(userFolderPath);
     }
     if (watching) gameOptions.recordInputsPath.clear();
+    if (crashReports) {
+        BugReportInfo info;
+        info.build = spec.build;
+        info.contentHash = data.contentHash;
+        info.scenePath = opt.scenePath.empty() ? project.settings.scene : opt.scenePath;
+        info.tuningPath = opt.tuningPath.empty() ? std::string(kDefaultTuningAsset) : opt.tuningPath;
+        armCrashReport(userFolder(project.settings), info, gameOptions.recordInputsPath);
+    }
 
     // Start decided by the command line: create/join a room starts at the lobby. Solo play starts at the menu for games with menus (automated runs/bots go straight to the match)
     if (watching) {
@@ -442,6 +460,13 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
 #endif
         if (!bugFolder.empty() && win.bugReportAt && frameCount == win.bugReportAt) bugStep = BugStep::Shot;
         if (win.gpuCaptureAt && frameCount == win.gpuCaptureAt) rhi::captureNextGpuFrame(false);
+        if (crashReports)
+            updateCrashReport(game->started() && game->debug() ? game->debug()->timeline().live : 0, session.playerCount(),
+                              session.localPlayer());
+        if (win.crashAt && frameCount == win.crashAt) {
+            MEALKIT_WARN("--crash-at: crashing on purpose at frame %u", frameCount);
+            *static_cast<volatile int*>(nullptr) = 0;
+        }
         if (window.consumeResize()) renderer.resize(window.width(), window.height());
         if (matches.usesOnline() && input.keyPressed('I') && !front.ui().editingText()) matches.inviteFriends();
 
