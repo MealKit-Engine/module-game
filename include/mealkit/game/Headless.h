@@ -108,6 +108,7 @@ int runHeadless(int argc, char** argv) {
     constexpr bool kHasGameProject = !std::is_same_v<GameProject, std::monostate>;
 
     log::setDialogs(false);
+    useBuildProjectDirectory(MEALKIT_THIS_BUILD);
     MatchOptions options;
     if (!parseGameArgs(argc, argv, options, nullptr)) {
         printGameUsage(nullptr, true);

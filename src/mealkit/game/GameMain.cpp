@@ -199,6 +199,7 @@ void mountGamePacks(const std::string& explicitPack) {
 }
 
 int runGame(int argc, char** argv, const GameMainSpec& spec) {
+    useBuildProjectDirectory(spec.build);
     MatchOptions opt;
     WindowOptions win;
     if (!parseGameArgs(argc, argv, opt, &win)) {

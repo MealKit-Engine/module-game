@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mealkit/core/Types.h"
+#include "mealkit/platform/Paths.h"
 
 // Info about this game build (ROADMAP stage 1 "Version display and connection rejection reasons"): shown in the window title, title screen, and lobby, and compared on connect.
 //   gameVersion  version from mealkit.project (set by people)
@@ -15,14 +16,21 @@ struct BuildInfo {
     u64 simVersion = 0;
     const char* gameVersion = "";
     const char* commit = "";
+    const char* projectDir = ""; // dev builds only: project folder, so an exe built outside it (engine repo samples) finds its assets
 };
+
+// Dev builds: if projectDir exists and no project root is set yet, use it for asset lookup (platform/Paths.h setProjectRoot).
+// Mounted packs still come first in findAsset.
+inline void useBuildProjectDirectory(const BuildInfo& build) {
+    if (build.projectDir[0] && projectRoot().empty() && directoryExists(build.projectDir)) setProjectRoot(build.projectDir);
+}
 
 } // namespace mealkit::game
 
 #if __has_include("mealkit_build_info.h")
 #include "mealkit_build_info.h"
 #define MEALKIT_THIS_BUILD                                                                                             \
-    ::mealkit::game::BuildInfo { MEALKIT_BUILD_SIM_VERSION, MEALKIT_BUILD_GAME_VERSION, MEALKIT_BUILD_COMMIT }
+    ::mealkit::game::BuildInfo { MEALKIT_BUILD_SIM_VERSION, MEALKIT_BUILD_GAME_VERSION, MEALKIT_BUILD_COMMIT, MEALKIT_BUILD_PROJECT_DIR }
 #else
 #define MEALKIT_THIS_BUILD                                                                                             \
     ::mealkit::game::BuildInfo {}
