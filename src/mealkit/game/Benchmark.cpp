@@ -22,7 +22,7 @@ f64 mb(u64 bytes) { return static_cast<f64>(bytes) / (1024.0 * 1024.0); }
 
 } // namespace
 
-bool Benchmark::frame(f64 dt, bool running, const FrameSample* sample) {
+bool Benchmark::frame(f64 dt, bool running, const FrameSample* sample, i64 allocations) {
     if (m_done || !running) return false;
     if (m_warm < m_config.warmupSeconds) { // periods ending during warmup are also dropped (a period overlapping warmup would be half mixed)
         m_warm += dt;
@@ -30,6 +30,13 @@ bool Benchmark::frame(f64 dt, bool running, const FrameSample* sample) {
     }
     m_frameTimes.push_back(dt);
     m_measured += dt;
+    if (allocations >= 0) {
+        const u64 n = static_cast<u64>(allocations);
+        m_hasAllocs = true;
+        m_allocs += n;
+        m_allocMax = std::max(m_allocMax, n);
+        m_allocFrames += n > 0 ? 1 : 0;
+    }
     if (sample) {
         const f64 w = sample->seconds;
         m_sampleSeconds += w;
@@ -56,6 +63,10 @@ BenchmarkResult Benchmark::result() const {
     BenchmarkResult r;
     r.seconds = m_measured;
     r.frames = static_cast<u32>(m_frameTimes.size());
+    r.hasAllocations = m_hasAllocs;
+    r.allocationsPerFrame = r.frames ? static_cast<f64>(m_allocs) / r.frames : 0.0;
+    r.allocationsMax = m_allocMax;
+    r.allocationFrames = m_allocFrames;
     if (r.frames) {
         r.frameMs = m_measured / r.frames * 1000.0;
         r.fps = r.frameMs > 0.0 ? 1000.0 / r.frameMs : 0.0;
@@ -102,8 +113,12 @@ std::string Benchmark::report(const BenchmarkInfo& info, const BenchmarkResult& 
             r.worstFrameMs);
     if (r.hasSim) appendf(out, "simulation  %.3f ms/tick\n", r.simMsPerTick);
     appendf(out, "draws       %.0f draw calls, %.0f instances (avg)\n", r.drawCalls, r.instances);
-    appendf(out, "memory      process %.0f MB peak | gpu %.0f MB peak of %.0f MB budget\n\n", mb(r.processMemoryPeak),
+    appendf(out, "memory      process %.0f MB peak | gpu %.0f MB peak of %.0f MB budget\n", mb(r.processMemoryPeak),
             mb(r.gpuMemoryPeak), mb(r.gpuMemoryBudget));
+    if (r.hasAllocations)
+        appendf(out, "allocations %.2f per frame avg | %llu max | %llu of %u frames (render + UI, main thread)\n", r.allocationsPerFrame,
+                static_cast<unsigned long long>(r.allocationsMax), static_cast<unsigned long long>(r.allocationFrames), r.frames);
+    out += "\n";
 
     if (!r.hasGpuTime) {
         out += "gpu time    not available (no timestamp queries)\n";
@@ -134,6 +149,7 @@ std::string Benchmark::summaryLine(const BenchmarkResult& r) {
     appendf(out, "BENCHMARK frames=%u avg=%.2fms p99=%.2fms worst=%.2fms sim=%.3fms gpu=%.2fms mem=%.0fMB gpumem=%.0fMB",
             r.frames, r.frameMs, r.p99FrameMs, r.worstFrameMs, r.simMsPerTick, r.hasGpuTime ? r.gpuMs : 0.0,
             mb(r.processMemoryPeak), mb(r.gpuMemoryPeak));
+    if (r.hasAllocations) appendf(out, " allocs=%.2f/%llu", r.allocationsPerFrame, static_cast<unsigned long long>(r.allocationsMax));
     return out;
 }
 

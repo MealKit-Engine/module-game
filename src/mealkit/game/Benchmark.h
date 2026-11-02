@@ -40,6 +40,10 @@ struct BenchmarkResult {
     f64 gpuMs = 0.0;
     f64 gpuPassMs[render::kGpuPassCount] = {};
     u64 processMemoryPeak = 0, gpuMemoryPeak = 0, gpuMemoryBudget = 0;
+    // Main thread heap allocations in the render + UI part of measured frames (debug/AllocCount.h; dev game exes only)
+    bool hasAllocations = false;
+    f64 allocationsPerFrame = 0.0;
+    u64 allocationsMax = 0, allocationFrames = 0; // most in one frame, frames with any
 };
 
 class Benchmark {
@@ -47,8 +51,9 @@ public:
     explicit Benchmark(const BenchmarkConfig& config) : m_config(config) {}
 
     // Once per frame. running: the match is running (time before that and warmup isn't counted).
-    // sample: the batch if a FrameStats period ended this frame, otherwise nullptr. true on the frame measurement finishes
-    bool frame(f64 dt, bool running, const FrameSample* sample);
+    // sample: the batch if a FrameStats period ended this frame, otherwise nullptr. true on the frame measurement finishes.
+    // allocations: this frame's render + UI heap allocations, or -1 when not counted
+    bool frame(f64 dt, bool running, const FrameSample* sample, i64 allocations = -1);
     bool done() const { return m_done; }
     BenchmarkResult result() const;
 
@@ -67,6 +72,8 @@ private:
     f64 m_sim = 0.0, m_draws = 0.0, m_instances = 0.0, m_gpu = 0.0;
     f64 m_gpuPass[render::kGpuPassCount] = {};
     u64 m_processPeak = 0, m_gpuPeak = 0, m_gpuBudget = 0;
+    bool m_hasAllocs = false;
+    u64 m_allocs = 0, m_allocMax = 0, m_allocFrames = 0;
 };
 
 } // namespace mealkit::game

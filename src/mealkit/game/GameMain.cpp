@@ -48,6 +48,7 @@
 #include "mealkit/scene/Scene.h"
 
 #if MEALKIT_DEBUG_UI
+#include "mealkit/debug/AllocCount.h"
 #include "mealkit/debug/ImGuiLayer.h"
 
 #include <imgui.h>
@@ -568,8 +569,12 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
             exitDeadline = now + 1.0; // exit after giving the other side time to receive the last tick
         }
 
+        i64 frameAllocs = -1; // render + UI heap allocations on this thread (benchmark, debug/AllocCount.h)
         if (!window.minimized()) {
             MEALKIT_ZONE("Render");
+#if MEALKIT_DEBUG_UI
+            const u64 allocsBefore = alloc::threadCount();
+#endif
             render::FrameParams frame;
             drawList.clear();
             game->buildFrame(ctx, now, frame, drawList);
@@ -610,6 +615,9 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
             if (debugUiShown) debugUi.render(renderer, active);
 #endif
             if (active) renderer.endFrame();
+#if MEALKIT_DEBUG_UI
+            if (alloc::counting()) frameAllocs = static_cast<i64>(alloc::threadCount() - allocsBefore);
+#endif
         }
 
         limiter.wait();
@@ -618,7 +626,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
 
         // ---- Status in the window title (4Hz) ----
         const bool perfSample = perf.update(dt, {&renderer, &session, &audio, game});
-        if (benchmark && bench.frame(dt, game->started(), perfSample ? &perf.sample() : nullptr)) {
+        if (benchmark && bench.frame(dt, game->started(), perfSample ? &perf.sample() : nullptr, frameAllocs)) {
             exitCode = writeBenchmark(bench, project.settings, spec, renderer, opt, win.benchmarkPath) ? 0 : 1;
             break;
         }
