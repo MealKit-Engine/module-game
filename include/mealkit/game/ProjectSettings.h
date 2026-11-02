@@ -98,6 +98,10 @@ MEALKIT_STRUCT(ProjectSettings) {
     MEALKIT_VIEW_FIELD(u32, budgetEnvironmentTextureSize, asset::kDefaultBudgets[2].textureSize, "Budget, environment: texture size (px)");
     MEALKIT_VIEW_FIELD(u32, budgetEnvironmentBones, asset::kDefaultBudgets[2].bones, "Budget, environment: bones");
     MEALKIT_VIEW_FIELD(u32, budgetEnvironmentMaterials, asset::kDefaultBudgets[2].materials, "Budget, environment: materials");
+    // Small-object distance cull (asset::ModelBudget::cullSize): screen size below which instances aren't drawn, 0 = off
+    MEALKIT_VIEW_FIELD(f32, cullCharactersSize, asset::kDefaultBudgets[0].cullSize, "Cull below screen size: characters");
+    MEALKIT_VIEW_FIELD(f32, cullPropsSize, asset::kDefaultBudgets[1].cullSize, "Cull below screen size: props");
+    MEALKIT_VIEW_FIELD(f32, cullEnvironmentSize, asset::kDefaultBudgets[2].cullSize, "Cull below screen size: environment");
 };
 
 struct ProjectFile {
@@ -132,10 +136,11 @@ net::AutoDelay autoDelayOf(const ProjectSettings& settings, f32 tickMs);
 
 // Per-kind model budgets (passed to ModelCache::setBudgets)
 inline void modelBudgets(const ProjectSettings& s, asset::ModelBudget (&out)[asset::kModelKindCount]) {
-    out[0] = {s.budgetCharactersTriangles, s.budgetCharactersTextureSize, s.budgetCharactersBones, s.budgetCharactersMaterials};
-    out[1] = {s.budgetPropsTriangles, s.budgetPropsTextureSize, s.budgetPropsBones, s.budgetPropsMaterials};
+    out[0] = {s.budgetCharactersTriangles, s.budgetCharactersTextureSize, s.budgetCharactersBones, s.budgetCharactersMaterials,
+              s.cullCharactersSize};
+    out[1] = {s.budgetPropsTriangles, s.budgetPropsTextureSize, s.budgetPropsBones, s.budgetPropsMaterials, s.cullPropsSize};
     out[2] = {s.budgetEnvironmentTriangles, s.budgetEnvironmentTextureSize, s.budgetEnvironmentBones,
-              s.budgetEnvironmentMaterials};
+              s.budgetEnvironmentMaterials, s.cullEnvironmentSize};
 }
 
 // findAsset path of the start scene ("assets/scenes/arena.scene")
