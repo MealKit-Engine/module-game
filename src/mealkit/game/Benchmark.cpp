@@ -131,8 +131,9 @@ std::string Benchmark::report(const BenchmarkInfo& info, const BenchmarkResult& 
 
 std::string Benchmark::summaryLine(const BenchmarkResult& r) {
     std::string out;
-    appendf(out, "BENCHMARK frames=%u avg=%.2fms p99=%.2fms worst=%.2fms sim=%.3fms gpu=%.2fms", r.frames, r.frameMs,
-            r.p99FrameMs, r.worstFrameMs, r.simMsPerTick, r.hasGpuTime ? r.gpuMs : 0.0);
+    appendf(out, "BENCHMARK frames=%u avg=%.2fms p99=%.2fms worst=%.2fms sim=%.3fms gpu=%.2fms mem=%.0fMB gpumem=%.0fMB",
+            r.frames, r.frameMs, r.p99FrameMs, r.worstFrameMs, r.simMsPerTick, r.hasGpuTime ? r.gpuMs : 0.0,
+            mb(r.processMemoryPeak), mb(r.gpuMemoryPeak));
     return out;
 }
 
