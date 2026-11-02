@@ -124,7 +124,7 @@ int runHeadless(int argc, char** argv) {
     Scenario scenarioFile;
     if (!options.testPath.empty()) {
         std::string error;
-        if (!loadScenario(options.testPath, scenarioFile, error)) {
+        if (!loadScenario(options.testPath, scenarioFile, error, options.updateExpected)) {
             MEALKIT_ERROR("Cannot read scenario %s: %s", options.testPath.c_str(), error.c_str());
             return 1;
         }

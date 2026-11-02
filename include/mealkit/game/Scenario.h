@@ -22,6 +22,8 @@
 // Ops: == != (any scalar, value read the same way as files: enum names, "x y z" for Vec3, seconds for Ticks) and < <= > >= (numbers).
 // Output: "SCENARIO FAIL <file>:<line> ..." per failed check, then "SCENARIO ok <file> checks=N" or "SCENARIO FAIL <file> failed=K/N".
 // --update-expected rewrites the values of == checks with the current results (when simulation results change on purpose, like record_replay.ps1).
+// A file without checks is accepted only with --update-expected: it gets one == check per top-level state value at the last tick
+// (the same checks as editor [Save Scenario]; MealKit QA [Save as Scenario] writes such a file from a report recording).
 namespace mealkit::game {
 
 inline constexpr int kScenarioFailedExit = 6;
@@ -43,7 +45,11 @@ struct Scenario {
     std::vector<ScenarioCheck> checks;
 };
 
-bool loadScenario(const std::string& file, Scenario& out, std::string& error);
+// allowNoChecks: --update-expected, which writes the checks of a file without any
+bool loadScenario(const std::string& file, Scenario& out, std::string& error, bool allowNoChecks = false);
+
+// "tick <t> <field> == <value>" lines for every top-level scalar state field (not view-only), as editor [Save Scenario] writes them
+std::string scenarioChecksText(const reflect::TypeInfo& stateType, const void* state, u32 tick);
 
 // One run: afterTick for every executed tick (state after running that tick), then finish.
 class ScenarioRun {
@@ -63,11 +69,13 @@ private:
     };
     bool evaluate(const ScenarioCheck& check, const void* state, Result& result);
     bool writeExpected() const;
+    bool appendChecks() const; // file without checks + update: the checks of the last tick
 
     Scenario m_scenario;
     const reflect::TypeInfo* m_stateType;
     bool m_updateExpected;
     std::vector<Result> m_results;
+    std::string m_lastChecks; // file without checks + update: scenarioChecksText of the latest tick
 };
 
 } // namespace mealkit::game

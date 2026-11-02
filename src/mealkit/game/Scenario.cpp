@@ -27,7 +27,7 @@ bool numberOf(const std::string& text, double& out) {
 
 } // namespace
 
-bool loadScenario(const std::string& file, Scenario& out, std::string& error) {
+bool loadScenario(const std::string& file, Scenario& out, std::string& error, bool allowNoChecks) {
     out = {};
     out.file = file;
     std::string content;
@@ -81,11 +81,24 @@ bool loadScenario(const std::string& file, Scenario& out, std::string& error) {
             out.checks.push_back(std::move(check));
         } else return bad("unknown key (seed, scene, inputs, ticks, tick)");
     }
-    if (out.checks.empty()) {
+    if (out.checks.empty() && !allowNoChecks) {
         error = "no 'tick' checks";
         return false;
     }
     return true;
+}
+
+std::string scenarioChecksText(const reflect::TypeInfo& stateType, const void* state, u32 tick) {
+    std::string text;
+    for (const reflect::FieldInfo& f : stateType.fields) {
+        const reflect::Kind kind = f.value->kind;
+        if ((f.flags & reflect::kFieldView) || kind == reflect::Kind::Struct || kind == reflect::Kind::Array ||
+            kind == reflect::Kind::Container)
+            continue;
+        const void* data = static_cast<const u8*>(state) + f.offset;
+        text += "tick " + std::to_string(tick) + " " + f.name + " == " + reflect::formatScalar(*f.value, data) + "\n";
+    }
+    return text;
 }
 
 ScenarioRun::ScenarioRun(Scenario scenario, const reflect::TypeInfo& stateType, bool updateExpected)
@@ -135,6 +148,7 @@ bool ScenarioRun::evaluate(const ScenarioCheck& check, const void* state, Result
 }
 
 void ScenarioRun::afterTick(u32 tick, const void* state) {
+    if (m_updateExpected && m_scenario.checks.empty()) m_lastChecks = scenarioChecksText(*m_stateType, state, tick);
     for (size_t i = 0; i < m_scenario.checks.size(); ++i) {
         const ScenarioCheck& c = m_scenario.checks[i];
         if (c.tick != tick) continue;
@@ -163,7 +177,26 @@ bool ScenarioRun::writeExpected() const {
     return writeTextFile(m_scenario.file, out);
 }
 
+bool ScenarioRun::appendChecks() const {
+    std::string content;
+    if (m_lastChecks.empty() || !readTextFile(m_scenario.file, content)) return false;
+    if (!content.empty() && content.back() != '\n') content += "\n";
+    return writeTextFile(m_scenario.file, content + m_lastChecks);
+}
+
 int ScenarioRun::finish(u32 lastTick) {
+    if (m_scenario.checks.empty()) { // only loaded with --update-expected
+        if (!appendChecks()) {
+            std::printf("SCENARIO FAIL %s cannot write the checks\n", m_scenario.file.c_str());
+            std::fflush(stdout);
+            return kScenarioFailedExit;
+        }
+        u32 count = 0;
+        for (char ch : m_lastChecks) count += ch == '\n';
+        std::printf("SCENARIO updated %s\nSCENARIO ok %s checks=%u\n", m_scenario.file.c_str(), m_scenario.file.c_str(), count);
+        std::fflush(stdout);
+        return 0;
+    }
     u32 failed = 0;
     for (size_t i = 0; i < m_scenario.checks.size(); ++i) {
         const ScenarioCheck& c = m_scenario.checks[i];
