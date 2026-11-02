@@ -15,6 +15,9 @@ namespace mealkit {
 namespace render {
 class DrawList;
 }
+namespace physics {
+class PhysicsWorld;
+}
 namespace scene {
 struct Scene;
 }
@@ -32,8 +35,9 @@ namespace mealkit::game {
 // 13: input actions (GameContext::actions), 14: debug UI (GameInstance::debugUi, the editor and game DLL share one ImGui from mealkit.dll),
 // 15: string tables (GameContext::strings), 16: game screen UI (GameContext::ui, GameModule::viewModels),
 // 17: player settings (GameContext::settings), 18: GameContext::userFolder (saves), 19: match start data (GameInstance::lobby, MatchInfo::loadouts),
-// 20: screen flow (GameContext::match, GameInstance::menus/stop, lobby names/ready/chat), 21: GameModule::build (build info)
-inline constexpr u32 kApiVersion = 21;
+// 20: screen flow (GameContext::match, GameInstance::menus/stop, lobby names/ready/chat), 21: GameModule::build (build info),
+// 22: GameInstance::physics (sound occlusion rays)
+inline constexpr u32 kApiVersion = 22;
 
 struct PlayOptions {
     bool bot = false;    // scripted input (automated tests)
@@ -81,6 +85,8 @@ public:
     virtual bool finished() const = 0;
     virtual bool captureDue() = 0;
     virtual f64 takeSimMsPerTick() = 0; // average since the last call
+    // The match's physics world, read by the engine between ticks for sound occlusion rays (audio::Engine::setOcclusionWorld). nullptr = no occlusion
+    virtual const physics::PhysicsWorld* physics() const { return nullptr; }
 
     // Changes tuning values immediately (editor solo play). tuning is a value of type GameModule::tuningType.
     virtual void setTuning(const void* tuning) = 0;

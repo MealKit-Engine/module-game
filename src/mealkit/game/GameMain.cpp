@@ -497,12 +497,14 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         if (!game->started() && session.state() == net::SessionState::Running) {
             if (loadingShown) {
                 game->start(ctx, scene, gameOptions);
+                audio.setReverbZones(scene);
                 MEALKIT_INFO("World ready: %u player(s), you are player %u, %u moving bodies", session.playerCount(),
                              session.localPlayer(), game->activeBodies());
             }
             loadingShown = !loadingShown;
         } else if (game->started() && session.state() != net::SessionState::Running) {
             game->stop(ctx); // back to lobby, left, disconnected
+            audio.setReverbZones(std::vector<audio::ReverbZone>{});
             loadingShown = false;
             if (keepingReplays) keepReplay(userFolderPath, project.settings.keepReplays);
         }
@@ -529,6 +531,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         for (const auto& [pressFrame, node] : win.uiPresses) // screen flow tests: press the widget on this frame (the game receives the action this frame)
             if (pressFrame == frameCount && !front.ui().pressAny(node)) MEALKIT_WARN("--ui-press: no widget '%s' at frame %u", node.c_str(), pressFrame);
         game->update(ctx, dt);
+        audio.setOcclusionWorld(game->started() ? game->physics() : nullptr); // every frame: never left pointing at a finished match
         audio.setMuted(win.mute || (front.settings().values().audio.muteUnfocused && !window.focused()));
         audio.update(dt);
         feedback.update(dt);
