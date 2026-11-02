@@ -19,6 +19,7 @@ void MatchService::init(const MatchServiceConfig& config) {
     m_session.reset();
     m_session.setContentHash(config.contentHash);
     m_session.setAcceptOtherBuilds(config.acceptOtherBuilds);
+    m_session.setSameInputOnly(config.sameInputOnly);
     m_session.setConditions(config.conditions);
     m_session.setAutoDelay(config.autoDelay);
     m_session.setContentParts(config.contentParts);
@@ -199,6 +200,8 @@ void MatchService::update(f64 now) {
             room.simVersion = config().build.simVersion ? config().build.simVersion : net::buildId();
             room.version = config().build.gameVersion;
             room.group = net::determinismGroup();
+            room.platform = net::platformName();
+            room.crossplay = m_session.crossplay();
             room.contentHash = m_config.contentHash;
             room.port = m_port;
             room.players = static_cast<u8>(m_session.lobbyPlayerCount());
@@ -212,6 +215,8 @@ void MatchService::update(f64 now) {
         m_finder.update(now);
         m_rooms.clear();
         for (const net::Room& r : m_finder.rooms()) {
+            // Crossplay off on either side: rooms on another OS aren't shown (joining would be rejected)
+            if (r.platform != net::platformName() && (!r.crossplay || !m_session.crossplay())) continue;
             RoomEntry e;
             e.address = r.address.toString();
             e.hostName = r.hostName;

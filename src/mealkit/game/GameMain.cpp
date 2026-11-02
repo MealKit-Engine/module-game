@@ -290,6 +290,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         MatchServiceConfig c;
         c.contentHash = data.contentHash;
         c.acceptOtherBuilds = opt.anyBuild;
+        c.sameInputOnly = !project.settings.mixInputKinds;
         c.playerName = opt.playerName;
         c.gameName = project.settings.name.empty() ? module.name : project.settings.name;
         c.defaultPort = opt.port;
@@ -496,6 +497,10 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         if (window.consumeResize()) renderer.resize(window.width(), window.height());
         if (matches.usesOnline() && input.keyPressed('I') && !front.ui().editingText()) matches.inviteFriends();
 
+        // Lobby shows each player's device (crossplay); the last one used counts
+        session.setLocalInputKind(front.actions().lastDevice() == input::Device::Gamepad ? net::InputKind::Gamepad
+                                                                                        : net::InputKind::KeyboardMouse);
+        session.setCrossplay(front.settings().values().gameplay.crossplay);
         matches.update(now);
         const net::SessionState state = session.state();
         if (!game->started() && state != net::SessionState::Running && state != net::SessionState::Ended)

@@ -61,6 +61,8 @@ MEALKIT_STRUCT(ProjectSettings) {
     MEALKIT_FIELD(u32, tickRate, 30, "Simulation ticks per second (30 or 60)");
     MEALKIT_VIEW_FIELD(std::string, language, "ko", "Default language (assets/strings/<language>.txt)");
     // Automatic input delay adjustment (decided by the host; doesn't need to match per peer, so outside the hash). Currently PC (wired) values; other platforms per kind in stage 5
+    // Crossplay (docs/ROADMAP.md stage 5): off = the host only takes players using its input kind (keyboard/mouse, gamepad, touch). Decided by the host, outside the hash
+    MEALKIT_VIEW_FIELD(bool, mixInputKinds, true, "Players with different input devices can play together");
     MEALKIT_VIEW_FIELD(bool, inputDelayAuto, true, "Choose the input delay from the players' ping");
     MEALKIT_VIEW_FIELD(u32, inputDelayMinMs, 60, "Shortest input delay (ms)");
     MEALKIT_VIEW_FIELD(u32, inputDelayMaxMs, 270, "Longest input delay (ms, slower players are warned in the lobby)");

@@ -34,6 +34,7 @@ enum class MatchPhase : u8 {
 struct MatchServiceConfig {
     u64 contentHash = 0;
     bool acceptOtherBuilds = false; // for tests (--any-build)
+    bool sameInputOnly = false;     // host: only players with the host's input kind (project setting mixInputKinds off)
     std::string gameName;           // LAN room announcements (only the same game shows in the list)
     u16 defaultPort = 27015;        // when host/join don't give a port (game project setting)
     u32 defaultMaxPlayers = 4;
