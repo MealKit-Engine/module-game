@@ -131,7 +131,13 @@ int runHeadless(int argc, char** argv) {
         // The scenario decides the match: the solo offline bot, or its input recording
         options.mode = MatchOptions::Mode::Offline;
         options.seed = scenarioFile.seed;
-        if (!scenarioFile.scene.empty()) options.scenePath = findAsset(scenarioFile.scene);
+        if (!scenarioFile.scene.empty()) { // an asset path (scenes/x.scene); a missing scene fails instead of quietly using the start scene
+            options.scenePath = findAssetFile(scenarioFile.scene);
+            if (options.scenePath.empty()) {
+                MEALKIT_ERROR("%s: scene %s not found in assets", options.testPath.c_str(), scenarioFile.scene.c_str());
+                return 1;
+            }
+        }
         options.replayInputsPath = scenarioFile.inputs;
     }
     MatchData data;
