@@ -235,7 +235,9 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         return 1;
 
     render::Renderer renderer;
-    if (!renderer.init({window.nativeHandle(), window.width(), window.height(), win.vsync, win.debugLayer, win.gpuCapture}))
+    // Pipeline cache in the per-game user data folder (project settings aren't loaded yet; the module name is the game's)
+    if (!renderer.init({window.nativeHandle(), window.width(), window.height(), win.vsync, win.debugLayer, win.gpuCapture,
+                        userDataDirectory() + "/" + module.name + "/cache"}))
         MEALKIT_FATAL("Renderer initialization failed.\n%s", renderer.initError());
     asset::ModelCache models;
     models.setRenderer(&renderer);
