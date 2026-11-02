@@ -36,6 +36,10 @@ struct GameRunOptions {
 
 // Reads the command line and calls runGame below (--help, --system-info)
 int runGame(int argc, char** argv, const GameMainSpec& spec);
+// Mounts the game data pack (platform/Pack.h): explicitPack (--pack), else every *.pak next to the exe (shipping). None in a dev build folder
+void mountGamePacks(const std::string& explicitPack = {});
+// Prints build.txt next to the exe (written by Export: engine version, commit, content hash) if present
+void printBuildStamp();
 // Window, renderer, session, Frontend, frame loop. Exit codes (0 normal, 2 desync, 3 session ended during a test, 4 rewind failure, 5 shadow desync)
 int runGame(MatchOptions match, const WindowOptions& window, const GameMainSpec& spec, const GameRunOptions& run = {});
 

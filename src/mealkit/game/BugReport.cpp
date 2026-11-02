@@ -101,6 +101,8 @@ std::string writeBugReport(const std::string& userFolder, const BugReportInfo& i
     ZipEntry shot{"screenshot.png", {}};
     if (!screenshotPath.empty() && readBytes(screenshotPath, shot.data)) entries.push_back(std::move(shot));
     entries.push_back(textEntry("log.txt", log::recentLines()));
+    std::string stamp; // shipping builds: engine version, commit, content hash (Export writes build.txt next to the exe)
+    if (readTextFile(executableDirectory() + "/build.txt", stamp)) entries.push_back(textEntry("build.txt", stamp));
 
     const std::string folder = userFolder + "/" + kBugReportFolder;
     createDirectories(folder);

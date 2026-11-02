@@ -66,6 +66,8 @@ void printGameUsage(const char* name, bool headless) {
                 "  --lang <code>          language of the game text (assets/strings/<code>.txt, default: language in mealkit.project)\n"
                 "  --benchmark [seconds]  fixed seed, bot input, vsync off: measure 30 s after a 3 s warm-up, write benchmark.txt, exit\n"
                 "  --benchmark-out <txt>  benchmark report path (default benchmark.txt)\n"
+                "  --cook <out.pak>       cook the assets the game reaches into a pack and exit (development builds; build.bat Export runs it)\n"
+                "  --pack <file.pak>      play from this pack instead of the assets folder (default: the .pak next to the exe)\n"
                 "  --headless --help      run without a window (headless options, replay)\n");
 }
 
@@ -160,6 +162,8 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
             w.benchmarkSeconds = 30.0;
             if (i + 1 < argc && argv[i + 1][0] != '-') w.benchmarkSeconds = std::max(1.0, std::atof(argv[++i]));
         } else if (a == "--benchmark-out" && next(v)) w.benchmarkPath = v;
+        else if (a == "--cook" && next(v)) w.cookPath = v;
+        else if (a == "--pack" && next(v)) w.packPath = v;
         else if (a == "--help" || a == "-h") return false;
         else {
             std::printf("Unknown option: %s\n", a.c_str());

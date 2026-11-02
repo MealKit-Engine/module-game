@@ -65,6 +65,8 @@ struct WindowOptions {
     u32 gpuCaptureAt = 0;      // --gpu-capture-at <frame>: capture that frame (automated tests, doesn't open the RenderDoc window)
     f64 benchmarkSeconds = 0.0; // --benchmark [seconds]: benchmark mode if not 0 (mealkit/game/Benchmark.h)
     std::string benchmarkPath = "benchmark.txt";
+    std::string cookPath; // --cook: write the shipping pack and exit (game/Cook.h)
+    std::string packPath; // --pack: mount this pack instead of the *.pak next to the exe (play the cooked game in a dev build)
 };
 
 // If window is nullptr, headless: window options are accepted and ignored, Steam isn't accepted. false for unknown options/--help.

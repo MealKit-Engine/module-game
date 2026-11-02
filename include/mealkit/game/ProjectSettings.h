@@ -37,6 +37,10 @@ MEALKIT_STRUCT(ProjectSettings) {
     MEALKIT_VIEW_FIELD(std::string, scene, "scenes/arena.scene", "Start scene (under assets)");
     // Game version: shown in the window title, title screen, and lobby, and part of the simulation version (at build time; no connecting with other versions)
     MEALKIT_VIEW_FIELD(std::string, version, "0.1.0", "Game version (shown to players, compared when joining)");
+    // Pack files (game/Cook.h): the cook step starts from the start scene and these scenes, follows references, and packs only what's reached.
+    // Assets opened only by a path in code go in packInclude (files or folders under assets; the cook warns about code paths it didn't reach)
+    MEALKIT_VIEW_FIELD(std::string, scenes, {}, "Other scenes to ship (under assets, separated by spaces)");
+    MEALKIT_VIEW_FIELD(std::string, packInclude, {}, "Always put in the pack (files or folders under assets, separated by spaces)");
     MEALKIT_VIEW_FIELD(bool, exportVersionFolder, false, "Put the version in the export folder name (export/<name>-<version>)");
     // Shown by the project manager. Choosing an image for the icon in the manager copies it as a PNG into the project folder
     MEALKIT_VIEW_FIELD(std::string, icon, "icon.png", "Game icon (PNG, project folder)");

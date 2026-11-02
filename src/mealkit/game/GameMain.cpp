@@ -20,9 +20,11 @@
 #include "mealkit/core/Log.h"
 #include "mealkit/core/Profile.h"
 #include "mealkit/core/Version.h"
+#include "mealkit/platform/Pack.h"
 #include "mealkit/feedback/Feedback.h"
 #include "mealkit/game/Benchmark.h"
 #include "mealkit/game/BugReport.h"
+#include "mealkit/game/Cook.h"
 #include "mealkit/game/FrameStats.h"
 #include "mealkit/game/DesyncDump.h"
 #include "mealkit/game/Frontend.h"
@@ -178,13 +180,33 @@ std::string lobbyStatus(const MatchService& match, const loc::Strings& strings) 
 
 } // namespace
 
+void printBuildStamp() {
+    std::string stamp;
+    if (readTextFile(executableDirectory() + "/build.txt", stamp)) std::printf("\nThis build (build.txt):\n%s", stamp.c_str());
+}
+
+void mountGamePacks(const std::string& explicitPack) {
+    std::vector<std::string> packs;
+    if (!explicitPack.empty()) packs.push_back(explicitPack);
+    else
+        for (const std::string& f : listFiles(executableDirectory(), ".pak")) packs.push_back(executableDirectory() + "/" + f);
+    for (const std::string& p : packs) {
+        std::string error;
+        if (mountPack(p, error)) MEALKIT_INFO("Pack: %s (content %016llx)", p.c_str(), static_cast<unsigned long long>(mountedPackHash()));
+        else MEALKIT_FATAL("Cannot read the game data: %s", error.c_str());
+    }
+}
+
 int runGame(int argc, char** argv, const GameMainSpec& spec) {
     MatchOptions opt;
     WindowOptions win;
     if (!parseGameArgs(argc, argv, opt, &win)) {
         printGameUsage(spec.module->name, false);
+        printBuildStamp();
         return 1;
     }
+    if (!win.cookPath.empty()) return cookGame(win.cookPath) ? 0 : 1;
+    mountGamePacks(win.packPath);
     if (win.systemInfo) return printSystemInfo();
     if (win.benchmarkSeconds > 0.0) { // benchmark: the same match every time (fixed seed + bots), no display sync, no sound
         if (opt.mode != MatchOptions::Mode::Offline) {
