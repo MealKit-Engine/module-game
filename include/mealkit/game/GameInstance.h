@@ -184,8 +184,16 @@ inline constexpr const char* kGetGameModuleSymbol = "mealkitGetGameModule";
 
 } // namespace mealkit::game
 
+// Exports a function from the game library: the editor finds mealkitGetGameModule by name (Windows .dll, Linux .so, macOS .dylib).
+// Clang/GCC outside Windows reject __declspec without -fdeclspec, and default visibility is what they export with
+#if defined(_WIN32)
+#define MEALKIT_GAME_EXPORT __declspec(dllexport)
+#else
+#define MEALKIT_GAME_EXPORT __attribute__((visibility("default")))
+#endif
+
 // Used once in the game DLL: MEALKIT_GAME_MODULE("Sandbox", sandbox::GameSession)
 #define MEALKIT_GAME_MODULE(NameLiteral, GameClass)                                                                    \
-    extern "C" __declspec(dllexport) const ::mealkit::game::GameModule* mealkitGetGameModule() {                       \
+    extern "C" MEALKIT_GAME_EXPORT const ::mealkit::game::GameModule* mealkitGetGameModule() {                       \
         return &::mealkit::game::gameModuleOf<GameClass>(NameLiteral);                                                 \
     }
