@@ -46,6 +46,7 @@ namespace mealkit::game {
 // Opens a session (solo, create room, join). On failure, logs and returns false.
 bool startHeadlessSession(net::LockstepSession& session, const MatchOptions& options, u64 seed);
 void printFinal(u32 tick, u64 hash, bool desynced);
+void printFinalState(const reflect::TypeInfo& type, const void* state); // --final-state
 
 template <class Game>
 auto headlessGameProjectSettings() {
@@ -246,6 +247,10 @@ int runHeadless(int argc, char** argv) {
         }
         if (sim.finished() && exitDeadline == 0.0) {
             printFinal(sim.nextTick() - 1, sim.world().hash(), session.desynced());
+            if (options.finalState) {
+                using State = std::remove_cvref_t<decltype(sim.world().state)>;
+                printFinalState(reflect::typeOf<State>(), &sim.world().state);
+            }
             exitCode = session.desynced() ? 2 : 0;
             if (scenario) {
                 const int scenarioCode = scenario->finish(sim.nextTick() - 1);

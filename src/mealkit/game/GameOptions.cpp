@@ -38,7 +38,8 @@ void printGameUsage(const char* name, bool headless) {
     if (headless)
         std::printf("  --replay-inputs <file> replay a recorded match and compare every tick hash (no network)\n"
                     "  --test <file>          run a scenario test (tests/*.scenario) and check state values\n"
-                    "  --update-expected      with --test: rewrite the == values in the file with the current results\n");
+                    "  --update-expected      with --test: rewrite the == values in the file with the current results\n"
+                    "  --final-state          print the state numbers at the last tick (STATE path value)\n");
     std::printf("  --any-build            host: accept peers running a different build (compiler comparison tests)\n"
                 "  --net-lag <ms>         add round-trip time to this process's connection (testing)\n"
                 "  --net-jitter <ms>      vary each packet's delay by up to this much (testing)\n"
@@ -116,6 +117,7 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
         else if (a == "--replay" && !headless && next(v)) o.replayInputsPath = v;
         else if (a == "--test" && headless && next(v)) o.testPath = v;
         else if (a == "--update-expected" && headless) o.updateExpected = true;
+        else if (a == "--final-state" && headless) o.finalState = true;
         else if (a == "--any-build") o.anyBuild = true;
         else if (a == "--net-lag" && next(v)) o.netLagMs = static_cast<f32>(std::atof(v));
         else if (a == "--net-jitter" && next(v)) o.netJitterMs = static_cast<f32>(std::atof(v));
