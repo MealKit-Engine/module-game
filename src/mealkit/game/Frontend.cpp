@@ -69,6 +69,12 @@ void Frontend::afterBuildFrame(render::FrameParams& frame) {
     m_ui.setCamera(frame.viewProj); // world-space UI: places what buildFrame added via drawAt on screen with this camera
     m_config.audio->setListener(frame.cameraPos, frame.cameraForward);
     m_config.feedback->screenTint(frame.tintColor, frame.tintAmount);
+    m_config.feedback->postKick(frame.post.bloomIntensity, frame.post.exposure);
+    // Event lights after the game's own: the renderer reads this memory during the frame
+    m_frameLights.assign(frame.lights, frame.lights + frame.lightCount);
+    m_config.feedback->addLights(m_frameLights);
+    frame.lights = m_frameLights.data();
+    frame.lightCount = static_cast<u32>(m_frameLights.size());
 }
 
 void Frontend::renderUi(render::Renderer& renderer) { m_ui.render(renderer); }

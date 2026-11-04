@@ -7,10 +7,12 @@
 #include "mealkit/input/Actions.h"
 #include "mealkit/loc/Strings.h"
 #include "mealkit/platform/Gamepad.h"
+#include "mealkit/render/Renderer.h"
 #include "mealkit/settings/Settings.h"
 #include "mealkit/ui/Ui.h"
 
 #include <string>
+#include <vector>
 
 namespace mealkit {
 class FrameLimiter;
@@ -86,6 +88,7 @@ private:
     LiveTuning m_viewTuning;
     ui::ScreenId m_subtitleScreen = ui::kNoScreen;
     SubtitlesVm m_subtitleVm;
+    std::vector<render::PointLight> m_frameLights; // the game's lights + event lights of this frame
     bool m_hasSubtitleScreen = false;
 };
 
