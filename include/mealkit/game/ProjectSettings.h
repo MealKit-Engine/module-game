@@ -34,10 +34,13 @@ MEALKIT_STRUCT(ProjectSettings) {
     MEALKIT_FIELD_FLAGS(std::string, name, {}, "Game name (exe name)", reflect::kFieldView | reflect::kFieldReadOnly);
     MEALKIT_FIELD_FLAGS(std::string, engine, {}, "Engine folder", reflect::kFieldView | reflect::kFieldReadOnly);
     MEALKIT_FIELD_FLAGS(std::string, engineVersion, {}, "Engine version", reflect::kFieldView | reflect::kFieldReadOnly);
-    // Engine modules the shipping exe links (docs/ENGINE_MODULES.md "Presets"): preset standard (every module) or solo (no net), plus additions.
+    // Engine modules the shipping exe links (docs/ENGINE_MODULES.md "Module selection and versions"): a preset (standard, solo), additions,
+    // removals; per-module versions are engineModuleVersion lines (kept as unknown lines).
     // Read by the build (cmake/MealKit.cmake), so changing them rebuilds the game; the editor always has every module
     MEALKIT_FIELD_FLAGS(std::string, enginePreset, "standard", "Engine preset (standard, solo)", reflect::kFieldView | reflect::kFieldReadOnly);
     MEALKIT_FIELD_FLAGS(std::string, engineModules, {}, "Engine modules added to the preset (separated by spaces)",
+                        reflect::kFieldView | reflect::kFieldReadOnly);
+    MEALKIT_FIELD_FLAGS(std::string, engineWithout, {}, "Engine modules taken out of the preset (separated by spaces)",
                         reflect::kFieldView | reflect::kFieldReadOnly);
     MEALKIT_VIEW_FIELD(std::string, scene, "scenes/arena.scene", "Start scene (under assets)");
     // Game version: shown in the window title, title screen, and lobby, and part of the simulation version (at build time; no connecting with other versions)

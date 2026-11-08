@@ -64,6 +64,8 @@ bool loadProjectFile(const std::string& path, ProjectFile& out, std::string* err
 
         if (key.compare(0, prefixLength, kGameSettingsPrefix) == 0) {
             out.gameFields.emplace_back(key.substr(prefixLength), value);
+        } else if (key == "engineModuleVersion") {
+            out.unknownFields.emplace_back(key, value); // one line per pinned module, read by the build (cmake/MealKit.cmake), kept as is
         } else if (!reflect::setFromText(type, &out.settings, key, value)) {
             MEALKIT_WARN("%s:%d: unknown project key '%s' kept as is", path.c_str(), lineNo, key.c_str());
             out.unknownFields.emplace_back(key, value);
