@@ -1,14 +1,17 @@
 #include "mealkit/game/Headless.h"
 
-#include "mealkit/net/Socket.h"
+#if MEALKIT_HAS_NET
+#include "mealkit/platform/Socket.h"
+#endif
 #include "mealkit/platform/Paths.h"
 #include "mealkit/platform/System.h"
 
 namespace mealkit::game {
 
-bool startHeadlessSession(net::LockstepSession& session, const MatchOptions& o, u64 seed) {
+bool startHeadlessSession(HeadlessSession& session, const MatchOptions& o, u64 seed) {
     switch (o.mode) {
     case MatchOptions::Mode::Offline: return session.startOffline(seed, o.matchData);
+#if MEALKIT_HAS_NET
     case MatchOptions::Mode::Host:
         if (!session.host(o.port, o.maxPlayers, o.inputDelay, o.loopbackOnly)) {
             MEALKIT_ERROR("Could not host on port %u", o.port);
@@ -31,6 +34,12 @@ bool startHeadlessSession(net::LockstepSession& session, const MatchOptions& o, 
         }
         return true;
     }
+#else
+    case MatchOptions::Mode::Host:
+    case MatchOptions::Mode::Join:
+    case MatchOptions::Mode::SteamHost:
+    case MatchOptions::Mode::SteamJoin: MEALKIT_ERROR("This build has no multiplayer (engine module net is off)"); return false;
+#endif
     }
     return false;
 }

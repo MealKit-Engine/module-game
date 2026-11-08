@@ -3,7 +3,7 @@
 #include "mealkit/core/Log.h"
 #include "mealkit/core/Version.h"
 #include "mealkit/core/Zip.h"
-#include "mealkit/net/Lockstep.h"
+#include "mealkit/session/Session.h"
 #include "mealkit/platform/Paths.h"
 #include "mealkit/platform/System.h"
 
@@ -39,7 +39,7 @@ std::string infoText(const char* header, const BugReportInfo& info) {
     text += "gameVersion = " + std::string(info.build.gameVersion) + "\n";
     text += "commit = " + std::string(info.build.commit) + "\n";
     text += "simulation = " + hex(info.build.simVersion) + "\n";
-    text += "determinismGroup = " + std::string(net::determinismGroup()) + "\n";
+    text += "determinismGroup = " + std::string(session::determinismGroup()) + "\n";
     text += "contentHash = " + hex(info.contentHash) + "\n";
     text += "scene = " + info.scenePath + "\n";
     text += "tuning = " + info.tuningPath + "\n";

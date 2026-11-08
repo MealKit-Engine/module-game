@@ -2,7 +2,7 @@
 
 #include "mealkit/core/Reflect.h"
 #include "mealkit/game/ProjectSettings.h"
-#include "mealkit/net/Lockstep.h"
+#include "mealkit/session/Session.h"
 #include "mealkit/scene/Scene.h"
 
 #include <string>

@@ -2,7 +2,7 @@
 
 #include "mealkit/asset/Budget.h"
 #include "mealkit/core/Reflect.h"
-#include "mealkit/net/Lockstep.h"
+#include "mealkit/session/Session.h"
 #include "mealkit/platform/Paths.h"
 
 #include <algorithm>
@@ -34,6 +34,11 @@ MEALKIT_STRUCT(ProjectSettings) {
     MEALKIT_FIELD_FLAGS(std::string, name, {}, "Game name (exe name)", reflect::kFieldView | reflect::kFieldReadOnly);
     MEALKIT_FIELD_FLAGS(std::string, engine, {}, "Engine folder", reflect::kFieldView | reflect::kFieldReadOnly);
     MEALKIT_FIELD_FLAGS(std::string, engineVersion, {}, "Engine version", reflect::kFieldView | reflect::kFieldReadOnly);
+    // Engine modules the shipping exe links (docs/ENGINE_MODULES.md "Presets"): preset standard (every module) or solo (no net), plus additions.
+    // Read by the build (cmake/MealKit.cmake), so changing them rebuilds the game; the editor always has every module
+    MEALKIT_FIELD_FLAGS(std::string, enginePreset, "standard", "Engine preset (standard, solo)", reflect::kFieldView | reflect::kFieldReadOnly);
+    MEALKIT_FIELD_FLAGS(std::string, engineModules, {}, "Engine modules added to the preset (separated by spaces)",
+                        reflect::kFieldView | reflect::kFieldReadOnly);
     MEALKIT_VIEW_FIELD(std::string, scene, "scenes/arena.scene", "Start scene (under assets)");
     // Game version: shown in the window title, title screen, and lobby, and part of the simulation version (at build time; no connecting with other versions)
     MEALKIT_VIEW_FIELD(std::string, version, "0.1.0", "Game version (shown to players, compared when joining)");
@@ -137,7 +142,7 @@ inline f32 tickDt() { return 1.0f / static_cast<f32>(reflect::tickRate()); }
 inline u32 msToTicks(u32 ms) { return std::max(1u, static_cast<u32>(static_cast<f32>(ms) * static_cast<f32>(reflect::tickRate()) / 1000.0f + 0.5f)); }
 
 // The project setting's input delay range in ticks (tickMs: ms per tick)
-net::AutoDelay autoDelayOf(const ProjectSettings& settings, f32 tickMs);
+session::AutoDelay autoDelayOf(const ProjectSettings& settings, f32 tickMs);
 
 // Per-kind model budgets (passed to ModelCache::setBudgets)
 inline void modelBudgets(const ProjectSettings& s, asset::ModelBudget (&out)[asset::kModelKindCount]) {

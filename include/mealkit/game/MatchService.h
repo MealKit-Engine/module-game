@@ -2,9 +2,11 @@
 
 #include "mealkit/core/Types.h"
 #include "mealkit/game/BuildInfo.h"
+#include "mealkit/session/LocalSession.h"
+#if MEALKIT_HAS_NET
 #include "mealkit/net/Lockstep.h"
 #include "mealkit/net/Rooms.h"
-#include "mealkit/session/LocalSession.h"
+#endif
 
 #include <string>
 #include <vector>
@@ -44,8 +46,10 @@ struct MatchServiceConfig {
     bool announceRooms = true;   // the host sends LAN room announcements (off for editor play)
     u64 seed = 0;                // if 0, the current time per match. If given, the first match uses this value, the next +1 (test reproduction)
     online::Service* online = nullptr; // Steam lobby (IP/LAN only if absent or init failed)
+#if MEALKIT_HAS_NET
     net::NetConditions conditions; // network condition simulation (--net-lag/--net-jitter/--net-loss)
-    net::AutoDelay autoDelay;      // automatic input delay adjustment (inputDelay fixed if off)
+#endif
+    session::AutoDelay autoDelay;      // automatic input delay adjustment (inputDelay fixed if off)
     BuildInfo build;        // this build (peers with a different simulation version are rejected; the game version is only shown)
     u64 contentParts[static_cast<u32>(session::ContentPart::Count)] = {}; // content hash components (rejection reasons)
     std::string playerName; // name shown in the lobby (if empty, the online account name, or failing that this computer's user name)
@@ -73,7 +77,11 @@ public:
     // The current session (GameContext::session): a local one for solo play and replays, the network one otherwise. The reference stays the same
     session::Session& session() { return m_active; }
     const session::Session& session() const { return m_active; }
+#if MEALKIT_HAS_NET
     net::LockstepSession& network() { return m_net; } // host/join setup and tests
+#endif
+    // false in builds without the net module (preset solo): host/join fail with a message, the menu can hide them
+    static constexpr bool multiplayerAvailable() { return MEALKIT_HAS_NET != 0; }
     // Player settings that reach both sessions
     void setCrossplay(bool allowed);
     void setLocalInputKind(session::InputKind kind);
@@ -109,7 +117,7 @@ public:
 
     // LAN room search: on while the join menu is open
     void setBrowsing(bool on);
-    bool browsing() const { return m_finder.isOpen(); }
+    bool browsing() const;
     const std::vector<RoomEntry>& rooms() const { return m_rooms; }
 
     // Every frame (before game update): session, online lobby, LAN room announce/search
@@ -122,12 +130,14 @@ private:
     u64 nextSeed();
 
     MatchServiceConfig m_config;
-    void useNetwork() { m_active.setTarget(m_net); }
     session::LocalSession m_local;
-    net::LockstepSession m_net;
     session::SessionSwitch m_active{m_local};
+#if MEALKIT_HAS_NET
+    void useNetwork() { m_active.setTarget(m_net); }
+    net::LockstepSession m_net;
     net::RoomAnnouncer m_announcer;
     net::RoomFinder m_finder;
+#endif
     std::vector<RoomEntry> m_rooms;
     std::string m_error;
     u16 m_port = 0;

@@ -114,8 +114,8 @@ void applyTickRate(const ProjectSettings& settings) {
     reflect::setTickRate(rate);
 }
 
-net::AutoDelay autoDelayOf(const ProjectSettings& s, f32 tickMs) {
-    net::AutoDelay a;
+session::AutoDelay autoDelayOf(const ProjectSettings& s, f32 tickMs) {
+    session::AutoDelay a;
     a.enabled = s.inputDelayAuto;
     a.tickMs = tickMs;
     a.minTicks = std::max(1u, static_cast<u32>(static_cast<f32>(s.inputDelayMinMs) / tickMs + 0.5f));

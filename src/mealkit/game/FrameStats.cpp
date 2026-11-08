@@ -3,7 +3,7 @@
 #include "mealkit/audio/Audio.h"
 #include "mealkit/core/Memory.h"
 #include "mealkit/game/GameInstance.h"
-#include "mealkit/net/Lockstep.h"
+#include "mealkit/session/Session.h"
 #include "mealkit/platform/System.h"
 
 #include <algorithm>

@@ -3,7 +3,7 @@
 #include "mealkit/core/Hash.h"
 #include "mealkit/core/Reflect.h"
 #include "mealkit/game/InputRecord.h"
-#include "mealkit/net/Lockstep.h"
+#include "mealkit/session/Session.h"
 
 #include <cstring>
 #include <type_traits>
@@ -45,7 +45,7 @@ bool readLoadout(const MatchInfo& match, u32 player, T& out) {
     return true;
 }
 
-// Values others picked in the lobby (to show on the lobby screen, net::LockstepSession::lobbyMembers). The match reads them with readLoadout
+// Values others picked in the lobby (to show on the lobby screen, session::Session::lobbyMembers). The match reads them with readLoadout
 template <class T>
 bool readLobbyLoadout(const session::LobbyMember& member, T& out) {
     checkLoadoutType<T>();

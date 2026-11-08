@@ -9,7 +9,7 @@
 #include "mealkit/game/InputRecord.h"
 #include "mealkit/game/SimDebug.h"
 #include "mealkit/game/WorldSnapshot.h"
-#include "mealkit/net/Lockstep.h"
+#include "mealkit/session/Session.h"
 
 #include <algorithm>
 #include <deque>

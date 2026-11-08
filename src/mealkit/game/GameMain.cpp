@@ -36,9 +36,11 @@
 #include "mealkit/game/ProjectSettings.h"
 #include "mealkit/game/RenderStyle.h"
 #include "mealkit/live/Server.h"
-#include "mealkit/net/Lockstep.h"
-#include "mealkit/net/Socket.h"
+#include "mealkit/session/Session.h"
+#include "mealkit/platform/Socket.h"
+#if MEALKIT_HAS_NET
 #include "mealkit/online/Online.h"
+#endif
 #include "mealkit/platform/Paths.h"
 #include "mealkit/platform/Process.h"
 #include "mealkit/platform/System.h"
@@ -106,7 +108,7 @@ bool writeBenchmark(const Benchmark& bench, const ProjectSettings& project, cons
     char sim[24];
     std::snprintf(sim, sizeof(sim), "%016llx", static_cast<unsigned long long>(spec.build.simVersion));
     info.simVersion = sim;
-    info.determinismGroup = net::determinismGroup();
+    info.determinismGroup = session::determinismGroup();
     info.cpu = cpuName();
     info.gpu = renderer.gpu();
     info.width = renderer.width();
@@ -165,9 +167,13 @@ std::string lobbyStatus(const MatchService& match, const loc::Strings& strings) 
     const auto num = [](u32 v) { return std::to_string(v); };
     switch (match.phase()) {
     case MatchPhase::Opening:
+#if MEALKIT_HAS_NET
         return strings.get(match.config().online && match.config().online->lobbyState() == online::LobbyState::Creating
                                ? "title.steamCreating"
                                : "title.steamJoining");
+#else
+        return {};
+#endif
     case MatchPhase::Connecting: return strings.format("title.connecting", {{"count", num(session.lobbyPlayerCount())}});
     case MatchPhase::Lobby:
         if (session.isOffline()) return {};
@@ -232,7 +238,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
 
     MEALKIT_INFO("CPU: %s", cpuName().c_str()); // for recording determinism on other PCs
     MEALKIT_INFO("Build: version %s, commit %s, simulation %016llx, %s", spec.build.gameVersion, spec.build.commit,
-                 static_cast<unsigned long long>(spec.build.simVersion), net::determinismGroup());
+                 static_cast<unsigned long long>(spec.build.simVersion), session::determinismGroup());
     Window window;
     if (!window.create({run.title.empty() ? module.name : run.title.c_str(), win.width, win.height, run.captionColor}))
         return 1;
@@ -275,6 +281,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     }
 #endif
 
+#if MEALKIT_HAS_NET
     // Online services (Steam/EOS): if included in the build, logs in at startup (menu [Create Steam Room], accepting friend invites)
     const bool steamAsked = opt.mode == MatchOptions::Mode::SteamHost || opt.mode == MatchOptions::Mode::SteamJoin;
     online::Service online;
@@ -285,6 +292,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
                       "manual/multiplayer.html#steamworks).",
                       online::Service::backendName());
 
+#endif
     // The session lives inside MatchService. The game's screen flow (menus) opens and joins rooms with the same functions
     MatchService matches;
     {
@@ -299,12 +307,16 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         c.inputDelay = opt.inputDelay;
         c.loopbackOnly = opt.loopbackOnly;
         c.seed = opt.seed;
+#if MEALKIT_HAS_NET
         c.conditions = {opt.netLagMs, opt.netJitterMs, opt.netLossPercent};
+#endif
         c.build = spec.build;
         std::copy(std::begin(data.contentParts), std::end(data.contentParts), std::begin(c.contentParts));
         c.autoDelay = autoDelayOf(project.settings, 1000.0f / static_cast<f32>(reflect::tickRate()));
         c.autoDelay.enabled = c.autoDelay.enabled && !opt.delayGiven; // --delay: fixed
+#if MEALKIT_HAS_NET
         c.online = online.available() ? &online : nullptr;
+#endif
         matches.init(c);
     }
     session::Session& session = matches.session(); // offline/replay or network, same reference
@@ -664,7 +676,9 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     module.destroy(game);
     matches.shutdown();
     audio.shutdown();
+#if MEALKIT_HAS_NET
     online.shutdown();
+#endif
 #if MEALKIT_DEBUG_UI
     debugUi.shutdown();
 #endif

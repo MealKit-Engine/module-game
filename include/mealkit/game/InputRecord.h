@@ -1,7 +1,7 @@
 #pragma once
 
 #include "mealkit/core/Types.h"
-#include "mealkit/net/Lockstep.h"
+#include "mealkit/session/Session.h"
 
 #include <cstdio>
 #include <string>
@@ -56,7 +56,7 @@ bool loadInputRecording(const std::string& path, InputRecording& out, std::strin
 // Replays (match recordings): the game exe and editor play write the input recording to <user folder>/replays/current.rec every match,
 // and when the match ends keepReplay keeps it under a date/time name (keepReplays from project settings, oldest deleted first).
 // A current.rec left over from a crash is also kept the same way on the next run (replays as many ticks as were read to the end).
-// Watching: game exe --replay <file>, editor [File] > [Open Replay] (net::LockstepSession::startReplay)
+// Watching: game exe --replay <file>, editor [File] > [Open Replay] (game::MatchService::playReplay)
 inline constexpr const char* kReplayFolder = "replays";
 std::string replayRecordingPath(const std::string& userFolder); // empty string if userFolder is empty (no recording)
 // Moves current.rec to replays/<YYYY-MM-DD_HH-MM>.rec and keeps only keep of them. Returns the kept path (empty string if no recording or no ticks)

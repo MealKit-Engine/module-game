@@ -12,10 +12,14 @@
 #include "mealkit/game/ProjectSettings.h"
 #include "mealkit/game/Scenario.h"
 #include "mealkit/game/Simulation.h"
-#include "mealkit/net/Lockstep.h"
 #include "mealkit/platform/Paths.h"
 #include "mealkit/platform/System.h"
 #include "mealkit/scene/Scene.h"
+#if MEALKIT_HAS_NET
+#include "mealkit/net/Lockstep.h"
+#else
+#include "mealkit/session/LocalSession.h"
+#endif
 
 #include <algorithm>
 #include <cstdio>
@@ -43,8 +47,15 @@
 //   static void defaults(game::MatchOptions&, const ProjectSettingsType&); // (optional) port/player count/match data defaults
 namespace mealkit::game {
 
+// Headless runs own their session: lockstep with the net module, otherwise local (solo and replays only)
+#if MEALKIT_HAS_NET
+using HeadlessSession = net::LockstepSession;
+#else
+using HeadlessSession = session::LocalSession;
+#endif
+
 // Opens a session (solo, create room, join). On failure, logs and returns false.
-bool startHeadlessSession(net::LockstepSession& session, const MatchOptions& options, u64 seed);
+bool startHeadlessSession(HeadlessSession& session, const MatchOptions& options, u64 seed);
 void printFinal(u32 tick, u64 hash, bool desynced);
 void printFinalState(const reflect::TypeInfo& type, const void* state); // --final-state
 
@@ -168,19 +179,23 @@ int runHeadless(int argc, char** argv) {
         return 1;
     }
 
-    net::LockstepSession session;
+    HeadlessSession session;
     session.setContentHash(data.contentHash);
-    session.setAcceptOtherBuilds(options.anyBuild);
     if (!options.playerName.empty()) session.setLocalName(options.playerName);
-    session.setConditions({options.netLagMs, options.netJitterMs, options.netLossPercent});
     const BuildInfo build = MEALKIT_THIS_BUILD; // expanded in the game's Headless.cpp (build info header)
+#if MEALKIT_HAS_NET
+    session.setAcceptOtherBuilds(options.anyBuild);
+    session.setConditions({options.netLagMs, options.netJitterMs, options.netLossPercent});
     session.setBuild(build.simVersion, build.gameVersion);
     session.setContentParts(data.contentParts);
+#endif
     MEALKIT_INFO("Build: version %s, commit %s, simulation %016llx, %s", build.gameVersion, build.commit,
-                 static_cast<unsigned long long>(build.simVersion), net::determinismGroup());
-    net::AutoDelay autoDelay = autoDelayOf(data.project.settings, 1000.0f / static_cast<f32>(reflect::tickRate()));
+                 static_cast<unsigned long long>(build.simVersion), session::determinismGroup());
+    session::AutoDelay autoDelay = autoDelayOf(data.project.settings, 1000.0f / static_cast<f32>(reflect::tickRate()));
     autoDelay.enabled = autoDelay.enabled && !options.delayGiven; // --delay: fixed
+#if MEALKIT_HAS_NET
     session.setAutoDelay(autoDelay);
+#endif
     const u64 seed = options.seed ? options.seed : static_cast<u64>(std::time(nullptr));
     auto loadout = [&] {
         if constexpr (requires { Game::botLoadout(u8{0}, session); }) Game::botLoadout(session.localPlayer(), session);
