@@ -1,6 +1,8 @@
 #include "mealkit/game/Frontend.h"
 
+#if MEALKIT_HAS_AUDIO
 #include "mealkit/audio/Audio.h"
+#endif
 #include "mealkit/feedback/Feedback.h"
 #include "mealkit/platform/Paths.h"
 
@@ -33,8 +35,11 @@ void Frontend::init(const FrontendConfig& config) {
 }
 
 GameContext Frontend::context(Window& window, render::Renderer& renderer, asset::ModelCache& models, MatchService& match) {
-    return GameContext{window, renderer, models, match.session(), match, *m_config.audio, *m_config.feedback,
-                       m_actions, m_strings, m_ui, m_settings};
+    return GameContext{window, renderer, models, match.session(), match,
+#if MEALKIT_HAS_AUDIO
+                       *m_config.audio,
+#endif
+                       *m_config.feedback, m_actions, m_strings, m_ui, m_settings};
 }
 
 void Frontend::update(f64 now, f64 dt, const Input& input, bool padAllowed, GameContext& ctx) {
@@ -50,7 +55,12 @@ void Frontend::update(f64 now, f64 dt, const Input& input, bool padAllowed, Game
     if (m_ui.wantsKeyboard()) ctx.keyboardAllowed = false;
     m_settings.update(&input, dt); // settings screen actions (before game update)
     // Subtitles (accessibility): the standard subtitle screen while a sound with subtitles is playing
+#if MEALKIT_HAS_AUDIO
     const std::vector<audio::Subtitle>& subtitles = m_config.audio->subtitles();
+#else
+    struct NoSubtitle { std::string key; };
+    const std::vector<NoSubtitle> subtitles; // no sound, so nothing to subtitle
+#endif
     const bool showSubtitles = m_hasSubtitleScreen && m_settings.values().gameplay.subtitles && !subtitles.empty();
     if (showSubtitles && !m_ui.isOpen(m_subtitleScreen)) {
         m_subtitleScreen = m_ui.open(kSubtitleScreen, kSubtitleLayer);
@@ -67,7 +77,9 @@ void Frontend::update(f64 now, f64 dt, const Input& input, bool padAllowed, Game
 
 void Frontend::afterBuildFrame(render::FrameParams& frame) {
     m_ui.setCamera(frame.viewProj); // world-space UI: places what buildFrame added via drawAt on screen with this camera
+#if MEALKIT_HAS_AUDIO
     m_config.audio->setListener(frame.cameraPos, frame.cameraForward);
+#endif
     m_config.feedback->screenTint(frame.tintColor, frame.tintAmount);
     m_config.feedback->postKick(frame.post.bloomIntensity, frame.post.exposure);
     // Event lights after the game's own: the renderer reads this memory during the frame

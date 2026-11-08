@@ -1,6 +1,8 @@
 #include "mealkit/game/FrameStats.h"
 
+#if MEALKIT_HAS_AUDIO
 #include "mealkit/audio/Audio.h"
+#endif
 #include "mealkit/core/Memory.h"
 #include "mealkit/game/GameInstance.h"
 #include "mealkit/session/Session.h"
@@ -116,6 +118,7 @@ bool FrameStats::update(f64 dt, const FrameSources& from) {
         s.processMemoryPeak = mem.peakResident;
         for (u32 i = 0; i < mem::tagCount(); ++i) s.taggedMemory += mem::stats({static_cast<u16>(i)}).bytes;
     }
+#if MEALKIT_HAS_AUDIO
     if (from.audio) {
         const audio::Stats& st = from.audio->stats();
         s.hasAudio = true;
@@ -123,6 +126,7 @@ bool FrameStats::update(f64 dt, const FrameSources& from) {
         s.virtualVoices = st.virtualVoices;
         s.audioMs = st.updateMs;
     }
+#endif
     m_sample = s;
     m_elapsed = m_worst = 0.0;
     m_frames = 0;

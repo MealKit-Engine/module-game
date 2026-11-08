@@ -15,7 +15,9 @@
 #if MEALKIT_DEBUG_UI
 #include "mealkit/debug/DebugDrawRender.h"
 #endif
+#if MEALKIT_HAS_AUDIO
 #include "mealkit/audio/Audio.h"
+#endif
 #include "mealkit/core/Clock.h"
 #include "mealkit/core/Log.h"
 #include "mealkit/core/Memory.h"
@@ -401,12 +403,18 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     limiter.setTargetFps(win.vsync ? 0.0 : win.fpsCap);
 
     // Sound: default output device (runs without sound if none). Muted when the window loses focus (can be turned off in player settings)
+#if MEALKIT_HAS_AUDIO
     audio::Engine audio;
     audio.init({project.settings.audioVoices, win.mute});
 #if MEALKIT_LIVE
     audio::addLiveService(liveServer, [&audio] { return &audio; }); // MealKit Audio: playback in the game, reload, status
 #endif
     feedback::Player feedback(audio); // assets/feedback.table: tick events → sound/shake/flash/hitstop
+    const audio::Engine* audioStats = &audio;
+#else
+    feedback::Player feedback; // built without the audio module: no sound
+    const audio::Engine* audioStats = nullptr;
+#endif
 
     // View-side services: input actions (assets/input.bindings + keys rebound by the player), string tables, game UI, player settings, view tuning.
     // Automated runs (--exit-tick) use default settings and don't save (so this PC's settings don't change test results; window size from the command line)
@@ -414,7 +422,9 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     {
         FrontendConfig c;
         c.renderer = &renderer;
+#if MEALKIT_HAS_AUDIO
         c.audio = &audio;
+#endif
         c.feedback = &feedback;
         const bool display = !automated && !win.windowGiven;
         c.displayWindow = display ? &window : nullptr;
@@ -542,7 +552,9 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         if (!game->started() && session.state() == session::SessionState::Running) {
             if (loadingShown) {
                 game->start(ctx, scene, gameOptions);
+#if MEALKIT_HAS_AUDIO
                 audio.setReverbZones(scene);
+#endif
                 MEALKIT_INFO("World ready: %u player(s), you are player %u, %u moving bodies", session.playerCount(),
                              session.localPlayer(), game->activeBodies());
             }
@@ -550,7 +562,9 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         } else if (game->started() && session.state() != session::SessionState::Running) {
             game->stop(ctx); // back to lobby, left, disconnected
             mem::endMatch();
+#if MEALKIT_HAS_AUDIO
             audio.setReverbZones(std::vector<audio::ReverbZone>{});
+#endif
             loadingShown = false;
             if (keepingReplays) keepReplay(userFolderPath, project.settings.keepReplays);
         }
@@ -577,9 +591,11 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         for (const auto& [pressFrame, node] : win.uiPresses) // screen flow tests: press the widget on this frame (the game receives the action this frame)
             if (pressFrame == frameCount && !front.ui().pressAny(node)) MEALKIT_WARN("--ui-press: no widget '%s' at frame %u", node.c_str(), pressFrame);
         game->update(ctx, dt);
+#if MEALKIT_HAS_AUDIO
         audio.setOcclusionWorld(game->started() ? game->physics() : nullptr); // every frame: never left pointing at a finished match
         audio.setMuted(win.mute || (front.settings().values().audio.muteUnfocused && !window.focused()));
         audio.update(dt);
+#endif
         feedback.update(dt);
         if (game->captureDue()) renderer.requestCapture(win.capturePath.c_str());
         ++frameCount;
@@ -646,7 +662,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         if (lastFrame) break;
 
         // ---- Status in the window title (4Hz) ----
-        const bool perfSample = perf.update(dt, {&renderer, &session, &audio, game});
+        const bool perfSample = perf.update(dt, {&renderer, &session, audioStats, game});
         mem::endFrame(); // nothing from this frame's frame arena is used after this point
         if (benchmark && bench.frame(dt, game->started(), perfSample ? &perf.sample() : nullptr, frameAllocs)) {
             exitCode = writeBenchmark(bench, project.settings, spec, renderer, opt, win.benchmarkPath) ? 0 : 1;
@@ -675,7 +691,9 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     if (keepingReplays) keepReplay(userFolderPath, project.settings.keepReplays); // the window was closed mid-match
     module.destroy(game);
     matches.shutdown();
+#if MEALKIT_HAS_AUDIO
     audio.shutdown();
+#endif
 #if MEALKIT_HAS_NET
     online.shutdown();
 #endif

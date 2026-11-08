@@ -54,7 +54,9 @@ struct GameContext {
     session::Session& session;
     // Open/join/leave matches (mealkit/game/MatchService.h): called by screen flow menus (host, join, playOffline, start, returnToLobby, leave)
     MatchService& match;
-    audio::Engine& audio; // sound event playback (mealkit/audio/Audio.h). Without a device, calls do nothing
+#if MEALKIT_HAS_AUDIO
+    audio::Engine& audio; // sound event playback (mealkit/audio/Audio.h). Without a device, calls do nothing. Absent in builds without the audio module
+#endif
     feedback::Player& feedback; // event → feedback table (mealkit/feedback/Feedback.h): trigger per tick event, camera shake, hitstop
     // Input actions (mealkit/input/Actions.h, assets/input.bindings): read like actions.axis2("move") without looking at keys directly.
     // The engine updates them every frame before update (devices not allowed are in released state). window.input() is for engine/debug keys only.
@@ -102,7 +104,10 @@ class ContextServices {
 public:
     explicit ContextServices(const GameContext& ctx)
         : m_window(ctx.window), m_renderer(ctx.renderer), m_models(ctx.models), m_session(ctx.session), m_match(ctx.match),
-          m_audio(ctx.audio), m_feedback(ctx.feedback), m_actions(ctx.actions), m_strings(ctx.strings), m_ui(ctx.ui),
+#if MEALKIT_HAS_AUDIO
+          m_audio(ctx.audio),
+#endif
+          m_feedback(ctx.feedback), m_actions(ctx.actions), m_strings(ctx.strings), m_ui(ctx.ui),
           m_settings(ctx.settings) {}
 
 private:
@@ -111,7 +116,9 @@ private:
     ServiceScope<asset::ModelCache> m_models;
     ServiceScope<session::Session> m_session;
     ServiceScope<MatchService> m_match;
+#if MEALKIT_HAS_AUDIO
     ServiceScope<audio::Engine> m_audio;
+#endif
     ServiceScope<feedback::Player> m_feedback;
     ServiceScope<input::Actions> m_actions;
     ServiceScope<const loc::Strings> m_strings;
