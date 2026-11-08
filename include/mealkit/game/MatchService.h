@@ -4,6 +4,7 @@
 #include "mealkit/game/BuildInfo.h"
 #include "mealkit/net/Lockstep.h"
 #include "mealkit/net/Rooms.h"
+#include "mealkit/session/LocalSession.h"
 
 #include <string>
 #include <vector>
@@ -69,8 +70,13 @@ public:
 
     void init(const MatchServiceConfig& config);
     const MatchServiceConfig& config() const { return m_config; }
-    net::LockstepSession& session() { return m_session; } // GameContext::session gives game code the session::Session view
-    const net::LockstepSession& session() const { return m_session; }
+    // The current session (GameContext::session): a local one for solo play and replays, the network one otherwise. The reference stays the same
+    session::Session& session() { return m_active; }
+    const session::Session& session() const { return m_active; }
+    net::LockstepSession& network() { return m_net; } // host/join setup and tests
+    // Player settings that reach both sessions
+    void setCrossplay(bool allowed);
+    void setLocalInputKind(session::InputKind kind);
 
     // From the menu (only when there's no session). false on failure, reason in error()
     bool playOffline();                                // solo: starts at the lobby (pick a loadout and start)
@@ -80,7 +86,7 @@ public:
     bool joinOnline(u64 lobbyId);
     // A saved replay straight into a match (no network, my input is discarded). When the match ends and returnToLobby is called, back to the menu (game/InputRecord.h)
     bool playReplay(const InputRecording& recording);
-    bool isReplay() const { return m_session.isReplay(); }
+    bool isReplay() const { return m_active.isReplay(); }
     // In the lobby (host). matchData is the match setting decided by the game
     bool start(u32 matchData = 0);
     // After the match (host): everyone back to the lobby
@@ -94,8 +100,8 @@ public:
 
     MatchPhase phase() const;
     const std::string& error() const { return m_error; }
-    bool isHost() const { return m_session.isHost(); }
-    bool isOffline() const { return m_session.isOffline(); }
+    bool isHost() const { return m_active.isHost(); }
+    bool isOffline() const { return m_active.isOffline(); }
     u16 port() const { return m_port; }
 
     // People in the lobby whose ping exceeds the input delay cap (bit = player index): they'll stutter during the match. The screen warns
@@ -112,10 +118,14 @@ public:
 
 private:
     bool fail(const std::string& message);
+    void resetSessions();
     u64 nextSeed();
 
     MatchServiceConfig m_config;
-    net::LockstepSession m_session;
+    void useNetwork() { m_active.setTarget(m_net); }
+    session::LocalSession m_local;
+    net::LockstepSession m_net;
+    session::SessionSwitch m_active{m_local};
     net::RoomAnnouncer m_announcer;
     net::RoomFinder m_finder;
     std::vector<RoomEntry> m_rooms;

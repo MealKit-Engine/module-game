@@ -16,112 +16,138 @@ MatchService::~MatchService() { shutdown(); }
 void MatchService::init(const MatchServiceConfig& config) {
     shutdown();
     m_config = config;
-    m_session.reset();
-    m_session.setContentHash(config.contentHash);
-    m_session.setAcceptOtherBuilds(config.acceptOtherBuilds);
-    m_session.setSameInputOnly(config.sameInputOnly);
-    m_session.setConditions(config.conditions);
-    m_session.setAutoDelay(config.autoDelay);
-    m_session.setContentParts(config.contentParts);
-    m_session.setBuild(config.build.simVersion, config.build.gameVersion);
+    m_net.reset();
+    m_net.setContentHash(config.contentHash);
+    m_net.setAcceptOtherBuilds(config.acceptOtherBuilds);
+    m_net.setSameInputOnly(config.sameInputOnly);
+    m_net.setConditions(config.conditions);
+    m_net.setAutoDelay(config.autoDelay);
+    m_net.setContentParts(config.contentParts);
+    m_net.setBuild(config.build.simVersion, config.build.gameVersion);
     std::string name = config.playerName;
     if (name.empty() && config.online && config.online->available()) name = config.online->displayName();
     if (name.empty()) name = userName();
-    m_session.setLocalName(name);
+    m_net.setLocalName(name);
+    m_local.reset();
+    m_local.setContentHash(config.contentHash);
+    m_local.setLocalName(name);
+    m_active.setTarget(m_local);
     m_error.clear();
+}
+
+void MatchService::resetSessions() {
+    m_net.reset();
+    m_local.reset();
+    m_active.setTarget(m_local);
+}
+
+void MatchService::setCrossplay(bool allowed) {
+    m_net.setCrossplay(allowed);
+    m_local.setCrossplay(allowed);
+}
+
+void MatchService::setLocalInputKind(session::InputKind kind) {
+    m_net.setLocalInputKind(kind);
+    m_local.setLocalInputKind(kind);
 }
 
 bool MatchService::fail(const std::string& message) {
     m_error = message;
     MEALKIT_WARN("%s", message.c_str());
-    m_session.reset();
+    resetSessions();
     m_online = false;
     return false;
 }
 
 u64 MatchService::nextSeed() {
-    const u64 index = m_session.matchIndex(); // count up to just before the match starting now
+    const u64 index = m_active.matchIndex(); // count up to just before the match starting now
     if (m_config.seed) return m_config.seed + index;
     return (static_cast<u64>(std::time(nullptr)) << 8) ^ index;
 }
 
 bool MatchService::playOffline() {
-    if (m_session.state() != session::SessionState::Idle) return false;
+    if (m_active.state() != session::SessionState::Idle) return false;
     m_error.clear();
     m_online = false;
-    return m_session.openOffline();
+    m_active.setTarget(m_local);
+    return m_local.openOffline();
 }
 
 bool MatchService::playReplay(const InputRecording& recording) {
-    if (m_session.state() != session::SessionState::Idle) return false;
+    if (m_active.state() != session::SessionState::Idle) return false;
     m_error.clear();
     m_online = false;
-    return m_session.startReplay(recording.match.seed, recording.match.matchData, recording.match.loadouts,
+    m_active.setTarget(m_local);
+    return m_local.startReplay(recording.match.seed, recording.match.matchData, recording.match.loadouts,
                                  recording.inputs, recording.hashes);
 }
 
 bool MatchService::host(u16 port, u32 maxPlayers) {
-    if (m_session.state() != session::SessionState::Idle) return false;
+    if (m_active.state() != session::SessionState::Idle) return false;
     m_error.clear();
     m_online = false;
+    useNetwork();
     m_port = port ? port : m_config.defaultPort;
     m_maxPlayers = maxPlayers ? maxPlayers : m_config.defaultMaxPlayers;
-    if (!m_session.host(m_port, m_maxPlayers, m_config.inputDelay, m_config.loopbackOnly))
+    if (!m_net.host(m_port, m_maxPlayers, m_config.inputDelay, m_config.loopbackOnly))
         return fail("Could not host on port " + std::to_string(m_port) + " (is another game using it?)");
     if (m_config.announceRooms) m_announcer.open(!m_config.loopbackOnly); // with --local, same PC only
     return true;
 }
 
 bool MatchService::hostOnline(u32 maxPlayers) {
-    if (m_session.state() != session::SessionState::Idle || !onlineAvailable()) return false;
+    if (m_active.state() != session::SessionState::Idle || !onlineAvailable()) return false;
     m_error.clear();
     m_online = true;
     m_onlineHost = true;
+    useNetwork();
     m_maxPlayers = maxPlayers ? maxPlayers : m_config.defaultMaxPlayers;
     m_config.online->createLobby(m_maxPlayers); // when ready, update opens the session
     return true;
 }
 
 bool MatchService::join(const std::string& address) {
-    if (m_session.state() != session::SessionState::Idle) return false;
+    if (m_active.state() != session::SessionState::Idle) return false;
     m_error.clear();
     m_online = false;
+    useNetwork();
     net::Address to;
     const bool resolved = net::startup() && net::resolveAddress(address.c_str(), m_config.defaultPort, to);
     net::cleanup();
     if (!resolved) return fail("Could not find the address '" + address + "'");
-    if (!m_session.join(to)) return fail("Could not open a UDP socket");
+    if (!m_net.join(to)) return fail("Could not open a UDP socket");
     return true;
 }
 
 bool MatchService::joinOnline(u64 lobbyId) {
-    if (m_session.state() != session::SessionState::Idle || !onlineAvailable()) return false;
+    if (m_active.state() != session::SessionState::Idle || !onlineAvailable()) return false;
     m_error.clear();
     m_online = true;
     m_onlineHost = false;
+    useNetwork();
     m_config.online->joinLobby(lobbyId);
     return true;
 }
 
 bool MatchService::start(u32 matchData) {
-    if (!m_session.isHost() || m_session.state() != session::SessionState::Lobby) return false;
-    m_session.startMatch(nextSeed(), matchData);
+    if (!m_active.isHost() || m_active.state() != session::SessionState::Lobby) return false;
+    m_active.startMatch(nextSeed(), matchData);
     return true;
 }
 
 void MatchService::returnToLobby() {
-    if (m_session.isReplay()) leave(); // replays have no lobby
-    else m_session.returnToLobby();
+    if (m_active.isReplay()) leave(); // replays have no lobby
+    else m_active.returnToLobby();
 }
 
 void MatchService::leave() {
     if (m_online && m_config.online) { // when the host leaves, lobby ownership also goes to the lockstep successor (so Steam doesn't pick someone else)
-        if (m_session.isHost()) m_config.online->setLobbyOwner(m_session.successorAddress().userId);
+        if (m_net.isHost()) m_config.online->setLobbyOwner(m_net.successorAddress().userId);
         m_config.online->leaveLobby();
     }
     m_online = false;
     m_announcer.close();
-    m_session.reset();
+    resetSessions();
     m_error.clear();
 }
 
@@ -132,7 +158,7 @@ void MatchService::inviteFriends() {
 }
 
 MatchPhase MatchService::phase() const {
-    switch (m_session.state()) {
+    switch (m_active.state()) {
     case session::SessionState::Idle: return m_online ? MatchPhase::Opening : MatchPhase::Menu;
     case session::SessionState::Connecting: return MatchPhase::Connecting;
     case session::SessionState::Lobby: return MatchPhase::Lobby;
@@ -145,7 +171,7 @@ MatchPhase MatchService::phase() const {
 u32 MatchService::slowPlayers() const {
     if (!m_config.autoDelay.enabled) return 0;
     u32 mask = 0;
-    for (const session::LobbyMember& m : m_session.lobbyMembers())
+    for (const session::LobbyMember& m : m_active.lobbyMembers())
         if (m.player < 32 && static_cast<f32>(m.pingMs) * 1.25f + m_config.autoDelay.tickMs >
                                  m_config.autoDelay.tickMs * static_cast<f32>(m_config.autoDelay.maxTicks))
             mask |= 1u << m.player;
@@ -166,15 +192,15 @@ void MatchService::update(f64 now) {
     online::Service* online = m_config.online;
     if (online && online->available()) {
         online->update();
-        if (m_online && m_session.state() == session::SessionState::Idle) {
+        if (m_online && m_net.state() == session::SessionState::Idle) {
             if (online->lobbyState() == online::LobbyState::Failed) {
                 fail("The online lobby failed (see log)");
             } else if (online->lobbyState() == online::LobbyState::InLobby) { // lockstep session to the host's address (platform relay)
                 if (online->isLobbyOwner()) {
-                    m_session.hostWith(online->createTransport(), m_maxPlayers, m_config.inputDelay);
+                    m_net.hostWith(online->createTransport(), m_maxPlayers, m_config.inputDelay);
                     online->inviteFriends();
                 } else {
-                    m_session.joinWith(online->createTransport(), online->lobbyOwnerAddress());
+                    m_net.joinWith(online->createTransport(), online->lobbyOwnerAddress());
                 }
             }
         }
@@ -184,30 +210,31 @@ void MatchService::update(f64 now) {
         }
     }
 
-    m_session.update(now);
-    if (m_session.state() == session::SessionState::Ended && m_error.empty()) m_error = m_session.endReason();
+    m_net.update(now);
+    m_local.update(now);
+    if (m_active.state() == session::SessionState::Ended && m_error.empty()) m_error = m_active.endReason();
     // After host migration: if the platform chose me as lobby owner but the lockstep host is someone else, hand it to them
-    if (m_online && online && online->isLobbyOwner() && !m_session.isHost() && m_session.hostAddress().userId)
-        online->setLobbyOwner(m_session.hostAddress().userId);
+    if (m_online && online && online->isLobbyOwner() && !m_net.isHost() && m_net.hostAddress().userId)
+        online->setLobbyOwner(m_net.hostAddress().userId);
 
     // LAN room announcements: during the lobby of a room opened by IP
     if (m_announcer.isOpen()) {
-        if (m_session.isHost() && m_session.state() == session::SessionState::Lobby) {
+        if (m_net.isHost() && m_net.state() == session::SessionState::Lobby) {
             net::RoomAnnouncement room;
             room.game = m_config.gameName;
-            const std::vector<session::LobbyMember>& members = m_session.lobbyMembers();
+            const std::vector<session::LobbyMember>& members = m_net.lobbyMembers();
             room.hostName = members.empty() ? std::string() : members.front().name;
             room.simVersion = config().build.simVersion ? config().build.simVersion : net::buildId();
             room.version = config().build.gameVersion;
             room.group = net::determinismGroup();
             room.platform = net::platformName();
-            room.crossplay = m_session.crossplay();
+            room.crossplay = m_net.crossplay();
             room.contentHash = m_config.contentHash;
             room.port = m_port;
-            room.players = static_cast<u8>(m_session.lobbyPlayerCount());
+            room.players = static_cast<u8>(m_net.lobbyPlayerCount());
             room.maxPlayers = static_cast<u8>(m_maxPlayers);
             m_announcer.update(now, room);
-        } else if (m_session.state() != session::SessionState::Running) {
+        } else if (m_net.state() != session::SessionState::Running) {
             m_announcer.close();
         }
     }
@@ -216,7 +243,7 @@ void MatchService::update(f64 now) {
         m_rooms.clear();
         for (const net::Room& r : m_finder.rooms()) {
             // Crossplay off on either side: rooms on another OS aren't shown (joining would be rejected)
-            if (r.platform != net::platformName() && (!r.crossplay || !m_session.crossplay())) continue;
+            if (r.platform != net::platformName() && (!r.crossplay || !m_net.crossplay())) continue;
             RoomEntry e;
             e.address = r.address.toString();
             e.hostName = r.hostName;
@@ -233,14 +260,16 @@ void MatchService::update(f64 now) {
 
 void MatchService::shutdown() {
     if (m_online && m_config.online) {
-        if (m_session.isHost()) m_config.online->setLobbyOwner(m_session.successorAddress().userId);
+        if (m_net.isHost()) m_config.online->setLobbyOwner(m_net.successorAddress().userId);
         m_config.online->leaveLobby();
     }
     m_online = false;
     m_announcer.close();
     m_finder.close();
     m_rooms.clear();
-    m_session.shutdown();
+    m_net.shutdown();
+    m_local.reset();
+    m_active.setTarget(m_local);
 }
 
 } // namespace mealkit::game

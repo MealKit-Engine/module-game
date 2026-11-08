@@ -307,7 +307,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         c.online = online.available() ? &online : nullptr;
         matches.init(c);
     }
-    net::LockstepSession& session = matches.session(); // the engine sets the session up (crossplay, input kind); game code sees session::Session
+    session::Session& session = matches.session(); // offline/replay or network, same reference
 
     GameInstance* game = module.create();
     const bool menus = game->menus();
@@ -500,9 +500,9 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         if (matches.usesOnline() && input.keyPressed('I') && !front.ui().editingText()) matches.inviteFriends();
 
         // Lobby shows each player's device (crossplay); the last one used counts
-        session.setLocalInputKind(front.actions().lastDevice() == input::Device::Gamepad ? session::InputKind::Gamepad
+        matches.setLocalInputKind(front.actions().lastDevice() == input::Device::Gamepad ? session::InputKind::Gamepad
                                                                                         : session::InputKind::KeyboardMouse);
-        session.setCrossplay(front.settings().values().gameplay.crossplay);
+        matches.setCrossplay(front.settings().values().gameplay.crossplay);
         matches.update(now);
         const session::SessionState state = session.state();
         if (!game->started() && state != session::SessionState::Running && state != session::SessionState::Ended)
