@@ -88,7 +88,7 @@ bool FrameStats::update(f64 dt, const FrameSources& from) {
         s.tick = from.game->nextTick();
     }
     if (from.session) {
-        const net::SessionStats& st = from.session->stats();
+        const session::SessionStats& st = from.session->stats();
         s.hasSession = true;
         s.localPlayer = from.session->localPlayer();
         s.playerCount = from.session->playerCount();

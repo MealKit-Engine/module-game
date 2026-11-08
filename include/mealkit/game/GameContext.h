@@ -31,8 +31,8 @@ class Service;
 namespace asset {
 class ModelCache;
 }
-namespace net {
-class LockstepSession;
+namespace session {
+class Session;
 }
 namespace scene {
 struct Scene;
@@ -51,7 +51,7 @@ struct GameContext {
     Window& window; // window (cursor capture, focus). Game input is actions
     render::Renderer& renderer;
     asset::ModelCache& models;
-    net::LockstepSession& session;
+    session::Session& session;
     // Open/join/leave matches (mealkit/game/MatchService.h): called by screen flow menus (host, join, playOffline, start, returnToLobby, leave)
     MatchService& match;
     audio::Engine& audio; // sound event playback (mealkit/audio/Audio.h). Without a device, calls do nothing
@@ -109,7 +109,7 @@ private:
     ServiceScope<Window> m_window;
     ServiceScope<render::Renderer> m_renderer;
     ServiceScope<asset::ModelCache> m_models;
-    ServiceScope<net::LockstepSession> m_session;
+    ServiceScope<session::Session> m_session;
     ServiceScope<MatchService> m_match;
     ServiceScope<audio::Engine> m_audio;
     ServiceScope<feedback::Player> m_feedback;

@@ -132,7 +132,7 @@ bool writeBenchmark(const Benchmark& bench, const ProjectSettings& project, cons
 }
 
 // When --exit-tick is reached: writes the lines read by automated tests (FINAL, SHADOW, REWIND) and returns the exit code
-int reportFinish(GameInstance& game, const net::LockstepSession& session, const MatchOptions& match,
+int reportFinish(GameInstance& game, const session::Session& session, const MatchOptions& match,
                  const WindowOptions& win) {
     std::printf("FINAL tick=%u hash=%016llx desync=%d\n", game.nextTick() - 1,
                 static_cast<unsigned long long>(game.stateHash()), session.desynced() ? 1 : 0);
@@ -161,7 +161,7 @@ int reportFinish(GameInstance& game, const net::LockstepSession& session, const 
 
 // Status written in the window title when no match is in progress (title.* keys in the game string table). Empty string if in progress or in a menu
 std::string lobbyStatus(const MatchService& match, const loc::Strings& strings) {
-    const net::LockstepSession& session = match.session();
+    const session::Session& session = match.session();
     const auto num = [](u32 v) { return std::to_string(v); };
     switch (match.phase()) {
     case MatchPhase::Opening:
@@ -307,7 +307,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         c.online = online.available() ? &online : nullptr;
         matches.init(c);
     }
-    net::LockstepSession& session = matches.session();
+    net::LockstepSession& session = matches.session(); // the engine sets the session up (crossplay, input kind); game code sees session::Session
 
     GameInstance* game = module.create();
     const bool menus = game->menus();
@@ -500,25 +500,25 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         if (matches.usesOnline() && input.keyPressed('I') && !front.ui().editingText()) matches.inviteFriends();
 
         // Lobby shows each player's device (crossplay); the last one used counts
-        session.setLocalInputKind(front.actions().lastDevice() == input::Device::Gamepad ? net::InputKind::Gamepad
-                                                                                        : net::InputKind::KeyboardMouse);
+        session.setLocalInputKind(front.actions().lastDevice() == input::Device::Gamepad ? session::InputKind::Gamepad
+                                                                                        : session::InputKind::KeyboardMouse);
         session.setCrossplay(front.settings().values().gameplay.crossplay);
         matches.update(now);
-        const net::SessionState state = session.state();
-        if (!game->started() && state != net::SessionState::Running && state != net::SessionState::Ended)
+        const session::SessionState state = session.state();
+        if (!game->started() && state != session::SessionState::Running && state != session::SessionState::Ended)
             game->lobby(session, gameOptions, ctx.userFolder); // lobby: decide the loadout (confirmed when the host starts)
 
-        if (session.isHost() && state == net::SessionState::Lobby && !session.isOffline()) {
+        if (session.isHost() && state == session::SessionState::Lobby && !session.isOffline()) {
             const bool enter = !menus && input.keyPressed(key::Enter);
             if (enter || (opt.autoStart && session.lobbyPlayerCount() >= opt.autoStart)) matches.start(opt.matchData);
         }
-        if (state == net::SessionState::Ended && opt.exitTick > 0 && exitDeadline == 0.0) {
+        if (state == session::SessionState::Ended && opt.exitTick > 0 && exitDeadline == 0.0) {
             MEALKIT_ERROR("Session ended before the exit tick: %s", session.endReason());
             exitCode = 3;
             break;
         }
         if (run.exitWhenSessionEnds && exitDeadline == 0.0) {
-            if (state == net::SessionState::Ended) {
+            if (state == session::SessionState::Ended) {
                 MEALKIT_INFO("Session ended: %s", session.endReason());
                 exitCode = session.desynced() ? 2 : 0;
                 break;
@@ -527,7 +527,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
         }
 
         // Match start/end: start is on the frame after the loading screen is drawn once (if the game's screen flow is Running it opens the loading screen)
-        if (!game->started() && session.state() == net::SessionState::Running) {
+        if (!game->started() && session.state() == session::SessionState::Running) {
             if (loadingShown) {
                 game->start(ctx, scene, gameOptions);
                 audio.setReverbZones(scene);
@@ -535,7 +535,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
                              session.localPlayer(), game->activeBodies());
             }
             loadingShown = !loadingShown;
-        } else if (game->started() && session.state() != net::SessionState::Running) {
+        } else if (game->started() && session.state() != session::SessionState::Running) {
             game->stop(ctx); // back to lobby, left, disconnected
             mem::endMatch();
             audio.setReverbZones(std::vector<audio::ReverbZone>{});

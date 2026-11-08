@@ -12,17 +12,17 @@
 //   The game declares MEALKIT_STRUCT(Loadout), and the view side sends it before the match (lobby) with game::setLoadout(session, value).
 //   The host confirms and distributes everyone's at startMatch, and match start (startWorld) reads it with game::readLoadout(match, player, value)
 //   and copies it into the World's player state (state fields → hash/snapshots). The simulation only reads that copy. It also goes into input recordings.
-//   Sent via memcpy, so no strings/containers, size up to net::kMaxLoadoutBytes (128). The first 4 bytes are the type name hash.
+//   Sent via memcpy, so no strings/containers, size up to session::kMaxLoadoutBytes (128). The first 4 bytes are the type name hash.
 namespace mealkit::game {
 
 template <class T>
 constexpr void checkLoadoutType() {
     static_assert(std::is_trivially_copyable_v<T>, "a loadout is sent with memcpy: no std::string, containers or pointers");
-    static_assert(sizeof(T) + 4 <= net::kMaxLoadoutBytes, "loadout too large (net::kMaxLoadoutBytes)");
+    static_assert(sizeof(T) + 4 <= session::kMaxLoadoutBytes, "loadout too large (session::kMaxLoadoutBytes)");
 }
 
 template <class T>
-bool setLoadout(net::LockstepSession& session, const T& loadout) {
+bool setLoadout(session::Session& session, const T& loadout) {
     checkLoadoutType<T>();
     u8 buffer[4 + sizeof(T)];
     const u32 type = static_cast<u32>(fnv1a(reflect::typeOf<T>().name));
@@ -47,7 +47,7 @@ bool readLoadout(const MatchInfo& match, u32 player, T& out) {
 
 // Values others picked in the lobby (to show on the lobby screen, net::LockstepSession::lobbyMembers). The match reads them with readLoadout
 template <class T>
-bool readLobbyLoadout(const net::LobbyMember& member, T& out) {
+bool readLobbyLoadout(const session::LobbyMember& member, T& out) {
     checkLoadoutType<T>();
     if (member.loadout.size() != 4 + sizeof(T)) return false;
     u32 type = 0;

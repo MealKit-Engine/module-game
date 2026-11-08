@@ -46,7 +46,7 @@ struct MatchServiceConfig {
     net::NetConditions conditions; // network condition simulation (--net-lag/--net-jitter/--net-loss)
     net::AutoDelay autoDelay;      // automatic input delay adjustment (inputDelay fixed if off)
     BuildInfo build;        // this build (peers with a different simulation version are rejected; the game version is only shown)
-    u64 contentParts[static_cast<u32>(net::ContentPart::Count)] = {}; // content hash components (rejection reasons)
+    u64 contentParts[static_cast<u32>(session::ContentPart::Count)] = {}; // content hash components (rejection reasons)
     std::string playerName; // name shown in the lobby (if empty, the online account name, or failing that this computer's user name)
 };
 
@@ -69,7 +69,7 @@ public:
 
     void init(const MatchServiceConfig& config);
     const MatchServiceConfig& config() const { return m_config; }
-    net::LockstepSession& session() { return m_session; }
+    net::LockstepSession& session() { return m_session; } // GameContext::session gives game code the session::Session view
     const net::LockstepSession& session() const { return m_session; }
 
     // From the menu (only when there's no session). false on failure, reason in error()

@@ -67,7 +67,7 @@ struct MatchData {
     scene::Scene scene;            // original (content hash, GameInstance::start). The simulation uses it flattened via scene::flattened
     reflect::Instance tuning;      // types.tuningType value
     u64 contentHash = 0;
-    u64 contentParts[static_cast<u32>(net::ContentPart::Count)] = {}; // per-component hashes (connection rejection reasons)
+    u64 contentParts[static_cast<u32>(session::ContentPart::Count)] = {}; // per-component hashes (connection rejection reasons)
 };
 
 // On failure (the given scene file can't be read), logs and returns false. models reads the model files used for the hash (CPU data only is fine).

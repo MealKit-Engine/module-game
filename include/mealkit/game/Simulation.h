@@ -30,7 +30,7 @@
 //   - late join/reconnect: the host provides snapshot bytes between ticks when the session wants them (provideSnapshot). The joiner loads the snapshot
 //     on its first update and runs from that tick, running up to kJoinCatchUpTicks per frame while catching up (catchingUp)
 //
-// World contract: state (MEALKIT_STRUCT, state.tick), physics, events, step(const net::TickInputs&), hash().
+// World contract: state (MEALKIT_STRUCT, state.tick), physics, events, step(const session::TickInputs&), hash().
 // When a match starts, reset(World&, physics thread count) initializes the real and shadow Worlds identically.
 namespace mealkit::game {
 
@@ -105,7 +105,7 @@ public:
         return std::clamp(static_cast<f32>(m_accumulator / m_tickDt), 0.0f, 1.0f);
     }
 
-    // My inputs sent but not yet executed (in target tick order): f(target tick, const net::PlayerInput&).
+    // My inputs sent but not yet executed (in target tick order): f(target tick, const session::PlayerInput&).
     // Used to draw my character moved ahead on screen only (hides input delay; the simulation is unchanged)
     template <class F>
     void forEachPendingInput(F&& f) const {
@@ -125,9 +125,9 @@ public:
         return ms;
     }
 
-    // Every frame. sample(tick) → local input to send this tick (net::PlayerInput), onTick(world) → this tick's events to the view side.
+    // Every frame. sample(tick) → local input to send this tick (session::PlayerInput), onTick(world) → this tick's events to the view side.
     template <class Sample, class OnTick>
-    void update(net::LockstepSession& session, f64 dt, Sample&& sample, OnTick&& onTick) {
+    void update(session::Session& session, f64 dt, Sample&& sample, OnTick&& onTick) {
         if (!m_started || m_finished) return;
         MEALKIT_ZONE("Simulation");
         const f64 simStart = nowSeconds();
@@ -185,7 +185,7 @@ public:
         t.first = m_snapshots.empty() ? m_nextTick : m_snapshots.front().tick;
         t.live = m_nextTick;
         t.view = m_viewingPast ? m_world->state.tick : m_nextTick;
-        size_t bytes = m_inputs.size() * sizeof(net::TickInputs) + m_hashes.size() * sizeof(u64) + m_live.byteSize();
+        size_t bytes = m_inputs.size() * sizeof(session::TickInputs) + m_hashes.size() * sizeof(u64) + m_live.byteSize();
         for (const WorldSnapshot& s : m_snapshots) bytes += s.byteSize();
         t.memoryBytes = bytes;
         return t;
@@ -248,8 +248,8 @@ public:
 
 private:
     template <class Sample, class OnTick>
-    void executeTick(net::LockstepSession& session, Sample& sample, OnTick& onTick) {
-        const net::TickInputs& inputs = session.inputs(m_nextTick);
+    void executeTick(session::Session& session, Sample& sample, OnTick& onTick) {
+        const session::TickInputs& inputs = session.inputs(m_nextTick);
         if (m_nextTick == 0 && !m_history && !session.isOffline() && !m_options.desyncDumpDir.empty()) {
             m_history = true; // snapshots for desync dumps (match values and whether it's multiplayer are known after the session becomes Running)
             clearHistory();
@@ -270,7 +270,7 @@ private:
         if (m_history) record(inputs, hash);
         onTick(*m_world); // tick events are cleared by the next step(), so they're moved to the view side right away every tick
 
-        const net::PlayerInput local = sample(m_nextTick);
+        const session::PlayerInput local = sample(m_nextTick);
         const u32 target = m_nextTick + session.inputDelay();
         session.submitLocalInput(target, local);
         while (!m_pending.empty() && m_pending.front().tick <= m_nextTick) m_pending.pop_front(); // executed ticks
@@ -298,7 +298,7 @@ private:
         m_paused = true; // pause at the diverged tick so the state can be inspected
     }
 
-    void record(const net::TickInputs& inputs, u64 hash) {
+    void record(const session::TickInputs& inputs, u64 hash) {
         m_inputs.push_back(inputs);
         m_hashes.push_back(hash);
         if (m_world->state.tick % kSnapshotInterval == 0) takeSnapshot();
@@ -327,14 +327,14 @@ private:
         if (m_history && m_world) takeSnapshot();
     }
 
-    void stepWorld(World& world, const net::TickInputs& inputs, u32 tick) {
+    void stepWorld(World& world, const session::TickInputs& inputs, u32 tick) {
         if (m_options.desyncTestTick && tick == m_options.desyncTestTick) world.physics.nudgeForTest();
         world.step(inputs);
     }
 
     // Late join: replace the World with the snapshot the host sent and run from that tick (start's reset only sets up static data).
     // The same id may have a different body, so all physics bodies are deleted and the snapshot's are created. false on failure (the match isn't run)
-    bool joinMatch(net::LockstepSession& session) {
+    bool joinMatch(session::Session& session) {
         std::vector<u8> bytes;
         if (!session.takeJoinSnapshot(bytes)) return m_joinFailed ? false : true;
         WorldSnapshot snapshot;
@@ -361,7 +361,7 @@ private:
     }
 
     // Writes the state of the desync tick reported by the session to a file (once). Loads the snapshot before that tick, reruns to that tick, then restores the current state
-    void dumpDesync(const net::LockstepSession& session) {
+    void dumpDesync(const session::Session& session) {
         const u32 tick = session.desyncTick();
         if (tick >= m_nextTick) return; // a tick not yet executed (next frame)
         m_desyncDumped = true;
@@ -424,7 +424,7 @@ private:
     std::string m_replayError;
 
     std::deque<WorldSnapshot> m_snapshots;
-    std::deque<net::TickInputs> m_inputs; // from tick m_inputBase
+    std::deque<session::TickInputs> m_inputs; // from tick m_inputBase
     std::deque<u64> m_hashes;
     u32 m_inputBase = 0;
     WorldSnapshot m_live; // current state while viewing the past
@@ -438,7 +438,7 @@ private:
 
     struct PendingInput {
         u32 tick = 0;
-        net::PlayerInput input;
+        session::PlayerInput input;
     };
     std::deque<PendingInput> m_pending; // my inputs sent but not yet executed
 };

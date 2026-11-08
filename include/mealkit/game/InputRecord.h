@@ -25,12 +25,12 @@ struct MatchInfo {
 };
 
 // Match values confirmed by the session (after Running)
-MatchInfo matchInfo(const net::LockstepSession& session);
+MatchInfo matchInfo(const session::Session& session);
 
 struct InputRecording {
     MatchInfo match;
     u64 contentHash = 0;
-    std::vector<net::TickInputs> inputs; // from tick 0
+    std::vector<session::TickInputs> inputs; // from tick 0
     std::vector<u64> hashes;             // state hash after running inputs[t]
 };
 
@@ -43,7 +43,7 @@ public:
 
     bool open(const std::string& path, const MatchInfo& match, u64 contentHash);
     bool isOpen() const { return m_file != nullptr; }
-    void write(const net::TickInputs& inputs, u64 hash);
+    void write(const session::TickInputs& inputs, u64 hash);
     void close();
 
 private:

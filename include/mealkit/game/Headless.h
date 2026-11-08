@@ -37,9 +37,9 @@
 //   using ProjectSettingsType = ...;    // (optional) game.* items in mealkit.project
 //   static void startWorld(World&, const game::MatchInfo&, const TuningType&, const scene::Scene& flatScene,
 //                          asset::ModelCache&, u32 physicsThreads);   // match start (GameSession uses the same function)
-//   static net::PlayerInput botInput(u32 tick, u8 player);            // --bot input (GameSession uses the same function)
-//   static void botCommands(u32 tick, u8 player, net::LockstepSession&); // (optional) --bot confirmed commands (mealkit/sim/Commands.h)
-//   static void botLoadout(u8 player, net::LockstepSession&);       // (optional) bot match start data (mealkit/game/Loadout.h)
+//   static session::PlayerInput botInput(u32 tick, u8 player);            // --bot input (GameSession uses the same function)
+//   static void botCommands(u32 tick, u8 player, session::Session&); // (optional) --bot confirmed commands (mealkit/sim/Commands.h)
+//   static void botLoadout(u8 player, session::Session&);       // (optional) bot match start data (mealkit/game/Loadout.h)
 //   static void defaults(game::MatchOptions&, const ProjectSettingsType&); // (optional) port/player count/match data defaults
 namespace mealkit::game {
 
@@ -212,15 +212,15 @@ int runHeadless(int argc, char** argv) {
         const f64 now = nowSeconds();
         if (exitDeadline > 0.0 && now >= exitDeadline) break;
         session.update(now);
-        if (session.state() == net::SessionState::Lobby) loadout();
-        if (session.isHost() && session.state() == net::SessionState::Lobby && session.lobbyPlayerCount() >= autoStart)
+        if (session.state() == session::SessionState::Lobby) loadout();
+        if (session.isHost() && session.state() == session::SessionState::Lobby && session.lobbyPlayerCount() >= autoStart)
             session.startMatch(seed, options.matchData);
-        if (session.state() == net::SessionState::Ended && exitDeadline == 0.0) {
+        if (session.state() == session::SessionState::Ended && exitDeadline == 0.0) {
             MEALKIT_ERROR("Session ended before the exit tick: %s", session.endReason());
             exitCode = 3;
             break;
         }
-        if (!sim.started() && session.state() == net::SessionState::Running) {
+        if (!sim.started() && session.state() == session::SessionState::Running) {
             sim.start(play, tickDt(), [&](World& world, u32 physicsThreads) {
                 start(world, matchInfo(session), physicsThreads);
             });

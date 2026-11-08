@@ -46,14 +46,14 @@ u64 MatchService::nextSeed() {
 }
 
 bool MatchService::playOffline() {
-    if (m_session.state() != net::SessionState::Idle) return false;
+    if (m_session.state() != session::SessionState::Idle) return false;
     m_error.clear();
     m_online = false;
     return m_session.openOffline();
 }
 
 bool MatchService::playReplay(const InputRecording& recording) {
-    if (m_session.state() != net::SessionState::Idle) return false;
+    if (m_session.state() != session::SessionState::Idle) return false;
     m_error.clear();
     m_online = false;
     return m_session.startReplay(recording.match.seed, recording.match.matchData, recording.match.loadouts,
@@ -61,7 +61,7 @@ bool MatchService::playReplay(const InputRecording& recording) {
 }
 
 bool MatchService::host(u16 port, u32 maxPlayers) {
-    if (m_session.state() != net::SessionState::Idle) return false;
+    if (m_session.state() != session::SessionState::Idle) return false;
     m_error.clear();
     m_online = false;
     m_port = port ? port : m_config.defaultPort;
@@ -73,7 +73,7 @@ bool MatchService::host(u16 port, u32 maxPlayers) {
 }
 
 bool MatchService::hostOnline(u32 maxPlayers) {
-    if (m_session.state() != net::SessionState::Idle || !onlineAvailable()) return false;
+    if (m_session.state() != session::SessionState::Idle || !onlineAvailable()) return false;
     m_error.clear();
     m_online = true;
     m_onlineHost = true;
@@ -83,7 +83,7 @@ bool MatchService::hostOnline(u32 maxPlayers) {
 }
 
 bool MatchService::join(const std::string& address) {
-    if (m_session.state() != net::SessionState::Idle) return false;
+    if (m_session.state() != session::SessionState::Idle) return false;
     m_error.clear();
     m_online = false;
     net::Address to;
@@ -95,7 +95,7 @@ bool MatchService::join(const std::string& address) {
 }
 
 bool MatchService::joinOnline(u64 lobbyId) {
-    if (m_session.state() != net::SessionState::Idle || !onlineAvailable()) return false;
+    if (m_session.state() != session::SessionState::Idle || !onlineAvailable()) return false;
     m_error.clear();
     m_online = true;
     m_onlineHost = false;
@@ -104,7 +104,7 @@ bool MatchService::joinOnline(u64 lobbyId) {
 }
 
 bool MatchService::start(u32 matchData) {
-    if (!m_session.isHost() || m_session.state() != net::SessionState::Lobby) return false;
+    if (!m_session.isHost() || m_session.state() != session::SessionState::Lobby) return false;
     m_session.startMatch(nextSeed(), matchData);
     return true;
 }
@@ -133,11 +133,11 @@ void MatchService::inviteFriends() {
 
 MatchPhase MatchService::phase() const {
     switch (m_session.state()) {
-    case net::SessionState::Idle: return m_online ? MatchPhase::Opening : MatchPhase::Menu;
-    case net::SessionState::Connecting: return MatchPhase::Connecting;
-    case net::SessionState::Lobby: return MatchPhase::Lobby;
-    case net::SessionState::Running: return MatchPhase::Running;
-    case net::SessionState::Ended: return MatchPhase::Ended;
+    case session::SessionState::Idle: return m_online ? MatchPhase::Opening : MatchPhase::Menu;
+    case session::SessionState::Connecting: return MatchPhase::Connecting;
+    case session::SessionState::Lobby: return MatchPhase::Lobby;
+    case session::SessionState::Running: return MatchPhase::Running;
+    case session::SessionState::Ended: return MatchPhase::Ended;
     }
     return MatchPhase::Menu;
 }
@@ -145,7 +145,7 @@ MatchPhase MatchService::phase() const {
 u32 MatchService::slowPlayers() const {
     if (!m_config.autoDelay.enabled) return 0;
     u32 mask = 0;
-    for (const net::LobbyMember& m : m_session.lobbyMembers())
+    for (const session::LobbyMember& m : m_session.lobbyMembers())
         if (m.player < 32 && static_cast<f32>(m.pingMs) * 1.25f + m_config.autoDelay.tickMs >
                                  m_config.autoDelay.tickMs * static_cast<f32>(m_config.autoDelay.maxTicks))
             mask |= 1u << m.player;
@@ -166,7 +166,7 @@ void MatchService::update(f64 now) {
     online::Service* online = m_config.online;
     if (online && online->available()) {
         online->update();
-        if (m_online && m_session.state() == net::SessionState::Idle) {
+        if (m_online && m_session.state() == session::SessionState::Idle) {
             if (online->lobbyState() == online::LobbyState::Failed) {
                 fail("The online lobby failed (see log)");
             } else if (online->lobbyState() == online::LobbyState::InLobby) { // lockstep session to the host's address (platform relay)
@@ -185,17 +185,17 @@ void MatchService::update(f64 now) {
     }
 
     m_session.update(now);
-    if (m_session.state() == net::SessionState::Ended && m_error.empty()) m_error = m_session.endReason();
+    if (m_session.state() == session::SessionState::Ended && m_error.empty()) m_error = m_session.endReason();
     // After host migration: if the platform chose me as lobby owner but the lockstep host is someone else, hand it to them
     if (m_online && online && online->isLobbyOwner() && !m_session.isHost() && m_session.hostAddress().userId)
         online->setLobbyOwner(m_session.hostAddress().userId);
 
     // LAN room announcements: during the lobby of a room opened by IP
     if (m_announcer.isOpen()) {
-        if (m_session.isHost() && m_session.state() == net::SessionState::Lobby) {
+        if (m_session.isHost() && m_session.state() == session::SessionState::Lobby) {
             net::RoomAnnouncement room;
             room.game = m_config.gameName;
-            const std::vector<net::LobbyMember>& members = m_session.lobbyMembers();
+            const std::vector<session::LobbyMember>& members = m_session.lobbyMembers();
             room.hostName = members.empty() ? std::string() : members.front().name;
             room.simVersion = config().build.simVersion ? config().build.simVersion : net::buildId();
             room.version = config().build.gameVersion;
@@ -207,7 +207,7 @@ void MatchService::update(f64 now) {
             room.players = static_cast<u8>(m_session.lobbyPlayerCount());
             room.maxPlayers = static_cast<u8>(m_maxPlayers);
             m_announcer.update(now, room);
-        } else if (m_session.state() != net::SessionState::Running) {
+        } else if (m_session.state() != session::SessionState::Running) {
             m_announcer.close();
         }
     }

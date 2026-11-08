@@ -97,16 +97,16 @@ bool loadMatchData(const GameTypes& types, const MatchDataOptions& options, asse
                                   {types.projectSettingsType, out.gameProject.data()}, types.tables);
     // Per component (to report which one differs; the combined hash is the one above)
     u64* parts = out.contentParts;
-    parts[static_cast<u32>(net::ContentPart::Scene)] = out.scene.contentHash(types.objectTypes);
-    parts[static_cast<u32>(net::ContentPart::Models)] = models.hashModels(out.scene);
+    parts[static_cast<u32>(session::ContentPart::Scene)] = out.scene.contentHash(types.objectTypes);
+    parts[static_cast<u32>(session::ContentPart::Models)] = models.hashModels(out.scene);
     Hasher tuningHash, projectHash, tablesHash;
     if (types.tuningType) reflect::hashStruct(*types.tuningType, out.tuning.data(), tuningHash);
     reflect::hashStruct(reflect::typeOf<ProjectSettings>(), &out.project.settings, projectHash, reflect::kFieldView);
     if (types.projectSettingsType) reflect::hashStruct(*types.projectSettingsType, out.gameProject.data(), projectHash, reflect::kFieldView);
     if (types.tables) data::hashTables(*types.tables, tablesHash);
-    parts[static_cast<u32>(net::ContentPart::Tuning)] = tuningHash.value;
-    parts[static_cast<u32>(net::ContentPart::Project)] = projectHash.value;
-    parts[static_cast<u32>(net::ContentPart::Tables)] = tablesHash.value;
+    parts[static_cast<u32>(session::ContentPart::Tuning)] = tuningHash.value;
+    parts[static_cast<u32>(session::ContentPart::Project)] = projectHash.value;
+    parts[static_cast<u32>(session::ContentPart::Tables)] = tablesHash.value;
     return true;
 }
 

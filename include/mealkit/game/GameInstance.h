@@ -62,7 +62,7 @@ public:
 
     // Every frame before the match starts (once just before opening the session for solo play): decides this player's match start data
     // (game::setLoadout, mealkit/game/Loadout.h). userFolder is where to read saves (none if empty)
-    virtual void lobby(net::LockstepSession& session, const PlayOptions& options, const std::string& userFolder) {
+    virtual void lobby(session::Session& session, const PlayOptions& options, const std::string& userFolder) {
         (void)session, (void)options, (void)userFolder;
     }
     // Called once when the session becomes Running (that frame is one frame after drawing the loading screen).

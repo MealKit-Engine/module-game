@@ -7,8 +7,8 @@
 #include <vector>
 
 namespace mealkit {
-namespace net {
-class LockstepSession;
+namespace session {
+class Session;
 }
 namespace audio {
 class Engine;
@@ -27,7 +27,7 @@ class GameInstance;
 // Sources: missing ones (nullptr) leave that item empty (session in edit mode, renderer in headless, etc.)
 struct FrameSources {
     const render::Renderer* renderer = nullptr;
-    const net::LockstepSession* session = nullptr;
+    const session::Session* session = nullptr;
     const audio::Engine* audio = nullptr;
     GameInstance* game = nullptr; // takeSimMsPerTick clears the average when read, so only FrameStats calls it
 };

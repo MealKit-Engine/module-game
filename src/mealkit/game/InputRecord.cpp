@@ -30,7 +30,7 @@ u64 get(const u8*& p, int bytes) {
 
 bool InputRecordWriter::open(const std::string& path, const MatchInfo& match, u64 contentHash) {
     close();
-    if (match.playerCount == 0 || match.playerCount > net::kMaxPlayers) return false;
+    if (match.playerCount == 0 || match.playerCount > session::kMaxPlayers) return false;
     if (!parentDirectory(path).empty()) createDirectories(parentDirectory(path));
     m_file = openFile(path, "wb");
     if (!m_file) {
@@ -48,19 +48,19 @@ bool InputRecordWriter::open(const std::string& path, const MatchInfo& match, u6
     for (u32 p = 0; p < match.playerCount; ++p) {
         const std::vector<u8> none;
         const std::vector<u8>& l = p < match.loadouts.size() ? match.loadouts[p] : none;
-        put(header, std::min<size_t>(l.size(), net::kMaxLoadoutBytes), 1);
-        header.insert(header.end(), l.begin(), l.begin() + static_cast<std::ptrdiff_t>(std::min<size_t>(l.size(), net::kMaxLoadoutBytes)));
+        put(header, std::min<size_t>(l.size(), session::kMaxLoadoutBytes), 1);
+        header.insert(header.end(), l.begin(), l.begin() + static_cast<std::ptrdiff_t>(std::min<size_t>(l.size(), session::kMaxLoadoutBytes)));
     }
     std::fwrite(header.data(), 1, header.size(), m_file);
     return true;
 }
 
-void InputRecordWriter::write(const net::TickInputs& inputs, u64 hash) {
+void InputRecordWriter::write(const session::TickInputs& inputs, u64 hash) {
     if (!m_file) return;
     std::vector<u8> tick;
-    tick.reserve(m_players * net::kInputBytes + 2 + inputs.commandBytes + 8);
+    tick.reserve(m_players * session::kInputBytes + 2 + inputs.commandBytes + 8);
     for (u32 p = 0; p < m_players; ++p)
-        tick.insert(tick.end(), inputs.players[p].bytes, inputs.players[p].bytes + net::kInputBytes);
+        tick.insert(tick.end(), inputs.players[p].bytes, inputs.players[p].bytes + session::kInputBytes);
     put(tick, inputs.commandBytes, 2);
     tick.insert(tick.end(), inputs.commands, inputs.commands + inputs.commandBytes);
     put(tick, hash, 8);
@@ -100,7 +100,7 @@ bool loadInputRecording(const std::string& path, InputRecording& out, std::strin
     out.match.matchData = static_cast<u32>(get(p, 4));
     get(p, 4);
     out.contentHash = get(p, 8);
-    if (out.match.playerCount == 0 || out.match.playerCount > net::kMaxPlayers) {
+    if (out.match.playerCount == 0 || out.match.playerCount > session::kMaxPlayers) {
         error = "bad player count";
         return false;
     }
@@ -120,17 +120,17 @@ bool loadInputRecording(const std::string& path, InputRecording& out, std::strin
             out.match.loadouts[pl].assign(p, p + size);
             p += size;
         }
-    const size_t inputBytes = out.match.playerCount * net::kInputBytes;
+    const size_t inputBytes = out.match.playerCount * session::kInputBytes;
     for (;;) {
         if (static_cast<size_t>(end - p) < inputBytes + (version >= 2 ? 2u : 0u) + 8u) break;
-        net::TickInputs in{};
+        session::TickInputs in{};
         for (u32 pl = 0; pl < out.match.playerCount; ++pl) {
-            std::memcpy(in.players[pl].bytes, p, net::kInputBytes);
-            p += net::kInputBytes;
+            std::memcpy(in.players[pl].bytes, p, session::kInputBytes);
+            p += session::kInputBytes;
         }
         if (version >= 2) {
             const u32 commandBytes = static_cast<u32>(get(p, 2));
-            if (commandBytes > net::kCommandBytesPerTick || static_cast<size_t>(end - p) < commandBytes + 8u) break;
+            if (commandBytes > session::kCommandBytesPerTick || static_cast<size_t>(end - p) < commandBytes + 8u) break;
             in.commandBytes = static_cast<u16>(commandBytes);
             std::memcpy(in.commands, p, commandBytes);
             p += commandBytes;
@@ -141,7 +141,7 @@ bool loadInputRecording(const std::string& path, InputRecording& out, std::strin
     return true;
 }
 
-MatchInfo matchInfo(const net::LockstepSession& session) {
+MatchInfo matchInfo(const session::Session& session) {
     MatchInfo m{session.seed(), session.playerCount(), session.matchData(), {}};
     for (u32 i = 0; i < m.playerCount; ++i) m.loadouts.push_back(session.loadout(i));
     return m;
