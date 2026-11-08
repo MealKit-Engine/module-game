@@ -40,7 +40,7 @@ struct BenchmarkResult {
     f64 gpuMs = 0.0;
     f64 gpuPassMs[render::kGpuPassCount] = {};
     u64 processMemoryPeak = 0, gpuMemoryPeak = 0, gpuMemoryBudget = 0;
-    // Main thread heap allocations in the render + UI part of measured frames (debug/AllocCount.h; dev game exes only)
+    // Main thread heap allocations in the render + UI part of measured frames (core/AllocCount.h; dev game exes only)
     bool hasAllocations = false;
     f64 allocationsPerFrame = 0.0;
     u64 allocationsMax = 0, allocationFrames = 0; // most in one frame, frames with any

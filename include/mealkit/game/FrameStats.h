@@ -60,6 +60,7 @@ struct FrameSample {
     u64 gpuMemoryUsed = 0, gpuMemoryBudget = 0; // bytes (0 if unknown)
 
     u64 processMemory = 0, processMemoryPeak = 0; // bytes (platform processMemory, when there is a renderer)
+    u64 taggedMemory = 0; // bytes counted by memory tags (core/Memory.h, every tag summed, when there is a renderer); per tag in json() and [Debug] > [Memory]
 
     bool hasAudio = false;
     u32 realVoices = 0, virtualVoices = 0;

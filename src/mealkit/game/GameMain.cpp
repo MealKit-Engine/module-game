@@ -18,6 +18,7 @@
 #include "mealkit/audio/Audio.h"
 #include "mealkit/core/Clock.h"
 #include "mealkit/core/Log.h"
+#include "mealkit/core/Memory.h"
 #include "mealkit/core/Profile.h"
 #include "mealkit/core/Version.h"
 #include "mealkit/platform/Pack.h"
@@ -48,7 +49,7 @@
 #include "mealkit/scene/Scene.h"
 
 #if MEALKIT_DEBUG_UI
-#include "mealkit/debug/AllocCount.h"
+#include "mealkit/core/AllocCount.h"
 #include "mealkit/debug/ImGuiLayer.h"
 
 #include <imgui.h>
@@ -535,6 +536,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
             loadingShown = !loadingShown;
         } else if (game->started() && session.state() != net::SessionState::Running) {
             game->stop(ctx); // back to lobby, left, disconnected
+            mem::endMatch();
             audio.setReverbZones(std::vector<audio::ReverbZone>{});
             loadingShown = false;
             if (keepingReplays) keepReplay(userFolderPath, project.settings.keepReplays);
@@ -632,6 +634,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
 
         // ---- Status in the window title (4Hz) ----
         const bool perfSample = perf.update(dt, {&renderer, &session, &audio, game});
+        mem::endFrame(); // nothing from this frame's frame arena is used after this point
         if (benchmark && bench.frame(dt, game->started(), perfSample ? &perf.sample() : nullptr, frameAllocs)) {
             exitCode = writeBenchmark(bench, project.settings, spec, renderer, opt, win.benchmarkPath) ? 0 : 1;
             break;

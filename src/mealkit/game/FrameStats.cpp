@@ -1,6 +1,7 @@
 #include "mealkit/game/FrameStats.h"
 
 #include "mealkit/audio/Audio.h"
+#include "mealkit/core/Memory.h"
 #include "mealkit/game/GameInstance.h"
 #include "mealkit/net/Lockstep.h"
 #include "mealkit/platform/System.h"
@@ -31,6 +32,7 @@ std::vector<std::string> items(const FrameSample& s) {
     }
     if (s.hasRenderer) add(std::snprintf(buf, sizeof(buf), "%u draws %u inst (%u culled)", s.drawCalls, s.instances, s.culled));
     if (s.processMemory) add(std::snprintf(buf, sizeof(buf), "mem %.0f MB", s.processMemory / 1048576.0));
+    if (s.taggedMemory) add(std::snprintf(buf, sizeof(buf), "tagged %.1f MB", s.taggedMemory / 1048576.0));
     if (s.gpuMemoryBudget)
         add(std::snprintf(buf, sizeof(buf), "vram %.0f/%.0f MB", s.gpuMemoryUsed / 1048576.0, s.gpuMemoryBudget / 1048576.0));
     if (s.hasAudio)
@@ -112,6 +114,7 @@ bool FrameStats::update(f64 dt, const FrameSources& from) {
         const ProcessMemory mem = processMemory(); // only in windowed runs (when the renderer is a source)
         s.processMemory = mem.resident;
         s.processMemoryPeak = mem.peakResident;
+        for (u32 i = 0; i < mem::tagCount(); ++i) s.taggedMemory += mem::stats({static_cast<u16>(i)}).bytes;
     }
     if (from.audio) {
         const audio::Stats& st = from.audio->stats();
@@ -169,6 +172,13 @@ std::string FrameStats::json() const {
                       s.audioMs);
         out += buf;
     }
+    out += ",\"memory\":{";
+    for (u32 i = 0; i < mem::tagCount(); ++i) {
+        const mem::Tag tag{static_cast<u16>(i)};
+        std::snprintf(buf, sizeof(buf), "%s\"%s\":%llu", i ? "," : "", mem::tagName(tag), static_cast<unsigned long long>(mem::stats(tag).bytes));
+        out += buf;
+    }
+    out += "}";
     return out + "}";
 }
 
