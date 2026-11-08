@@ -1,5 +1,6 @@
 #include "mealkit/game/GameOptions.h"
 
+#include "mealkit/core/Modules.h"
 #include "mealkit/core/Version.h"
 
 #include <algorithm>
@@ -33,7 +34,8 @@ void printGameUsage(const char* name, bool headless) {
                 "  --hash-log <file>      write \"<tick> <hash>\" for every tick\n"
                 "  --abort-host-at <t>    headless: the first peer that took over as host exits at tick t without closing the session\n"
                 "  --desync-test <t>      nudge the physics before tick t to cause a desync (dumps go to build/desync)\n"
-                "  --record-inputs <file> save the confirmed inputs and hashes of every tick\n",
+                "  --record-inputs <file> save the confirmed inputs and hashes of every tick\n"
+                "  --modules              list the engine modules built into this executable, in dependency order\n",
                 headless ? " (default: --players)" : "", headless ? " (required unless replaying)" : "");
     if (headless)
         std::printf("  --replay-inputs <file> replay a recorded match and compare every tick hash (no network)\n"
@@ -166,7 +168,10 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
         } else if (a == "--benchmark-out" && next(v)) w.benchmarkPath = v;
         else if (a == "--cook" && next(v)) w.cookPath = v;
         else if (a == "--pack" && next(v)) w.packPath = v;
-        else if (a == "--help" || a == "-h") return false;
+        else if (a == "--modules") { // engine modules in this build (core/Modules.h), then exit
+            logEngineModules();
+            std::exit(0);
+        } else if (a == "--help" || a == "-h") return false;
         else {
             std::printf("Unknown option: %s\n", a.c_str());
             return false;

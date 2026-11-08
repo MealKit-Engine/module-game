@@ -426,6 +426,7 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     GameContext ctx = front.context(window, renderer, models, matches);
     ctx.userFolder = userFolderPath; // saves (automated runs don't save)
     ctx.scene = &scene;
+    const ContextServices contextServices{ctx}; // services::get<T>() for code without a GameContext (core/Services.h)
 #if MEALKIT_DEBUG_UI
     // Debug UI (F1): dev builds only (shipping build.bat Export has no ImGui). Created when first turned on (reads fonts)
     debug::ImGuiLayer debugUi;

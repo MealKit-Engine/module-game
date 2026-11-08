@@ -2,6 +2,7 @@
 
 #include "mealkit/core/Log.h"
 #include "mealkit/core/Reflect.h"
+#include "mealkit/core/Services.h"
 #include "mealkit/core/Types.h"
 #include "mealkit/render/Renderer.h"
 
@@ -77,6 +78,13 @@ struct GameContext {
     // Match scene (same as what's passed to start). Used for pre-match screens (background behind menus). May change next frame, so don't keep it
     const scene::Scene* scene = nullptr;
 
+    // Services outside this struct (modules a game adds to its preset, such as online): core/Services.h registry.
+    // Including the module's header already needs the module in the build, and its owner provides it before game code runs.
+    template <class T>
+    T& get() const {
+        return services::get<T>();
+    }
+
     template <class T>
     const T& viewTuning() const {
         MEALKIT_ASSERT(!viewTuningData.data || viewTuningData.type == &reflect::typeOf<T>());
@@ -86,6 +94,29 @@ struct GameContext {
         }
         return *static_cast<const T*>(viewTuningData.data);
     }
+};
+
+// Provides every GameContext member as a service for one scope (game exe main, editor play session), so code that has no
+// GameContext (engine modules, tools) finds them with services::get<T>(). Withdrawn in reverse order when the scope ends.
+class ContextServices {
+public:
+    explicit ContextServices(const GameContext& ctx)
+        : m_window(ctx.window), m_renderer(ctx.renderer), m_models(ctx.models), m_session(ctx.session), m_match(ctx.match),
+          m_audio(ctx.audio), m_feedback(ctx.feedback), m_actions(ctx.actions), m_strings(ctx.strings), m_ui(ctx.ui),
+          m_settings(ctx.settings) {}
+
+private:
+    ServiceScope<Window> m_window;
+    ServiceScope<render::Renderer> m_renderer;
+    ServiceScope<asset::ModelCache> m_models;
+    ServiceScope<net::LockstepSession> m_session;
+    ServiceScope<MatchService> m_match;
+    ServiceScope<audio::Engine> m_audio;
+    ServiceScope<feedback::Player> m_feedback;
+    ServiceScope<input::Actions> m_actions;
+    ServiceScope<const loc::Strings> m_strings;
+    ServiceScope<ui::System> m_ui;
+    ServiceScope<settings::Service> m_settings;
 };
 
 } // namespace mealkit::game
