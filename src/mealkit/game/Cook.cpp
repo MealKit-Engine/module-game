@@ -1,8 +1,8 @@
 #include "mealkit/game/Cook.h"
 
 #include "mealkit/asset/Cooked.h"
-#include "mealkit/asset/Environment.h"
-#include "mealkit/asset/TextureCache.h"
+#include "mealkit/render/Environment.h"
+#include "mealkit/render/TextureCache.h"
 #include "mealkit/core/Log.h"
 #include "mealkit/game/ProjectSettings.h"
 #include "mealkit/platform/Pack.h"
@@ -165,7 +165,7 @@ bool cookGame(const std::string& outPack) {
         if (endsWith(p, ".glb") || endsWith(p, ".gltf")) {
             asset::CookedModel model;
             std::string modelError, cameraError;
-            const bool isModel = asset::importModel(file, model, &asset::loadCompressedTexture, modelError);
+            const bool isModel = asset::importModel(file, model, &render::loadCompressedTexture, modelError);
             if (isModel) pack.add(packed + asset::kCookedModelSuffix, asset::writeCookedModel(model));
             std::vector<asset::CameraClip> clips;
             const bool isCamera = asset::loadCameraClips(file, clips, cameraError);
@@ -177,9 +177,9 @@ bool cookGame(const std::string& outPack) {
             continue;
         }
         if (endsWith(p, ".hdr")) {
-            asset::EnvironmentMap env;
+            render::EnvironmentMap env;
             std::string bytes;
-            const std::string cache = asset::loadEnvironment(file, env, error) ? asset::environmentCacheFile(file) : std::string();
+            const std::string cache = render::loadEnvironment(file, env, error) ? render::environmentCacheFile(file) : std::string();
             if (cache.empty() || !readTextFile(cache, bytes)) {
                 MEALKIT_WARN("Cook: %s: %s", p.c_str(), cache.empty() ? error.c_str() : "cannot read the baked cache");
                 ++failed;

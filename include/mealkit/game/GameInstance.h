@@ -36,8 +36,9 @@ namespace mealkit::game {
 // 15: string tables (GameContext::strings), 16: game screen UI (GameContext::ui, GameModule::viewModels),
 // 17: player settings (GameContext::settings), 18: GameContext::userFolder (saves), 19: match start data (GameInstance::lobby, MatchInfo::loadouts),
 // 20: screen flow (GameContext::match, GameInstance::menus/stop, lobby names/ready/chat), 21: GameModule::build (build info),
-// 22: GameInstance::physics (sound occlusion rays), 23: GameContext::get (core/Services.h registry), 24: ctx.session/MatchService::session() is session::Session (net optional)
-inline constexpr u32 kApiVersion = 24;
+// 22: GameInstance::physics (sound occlusion rays), 23: GameContext::get (core/Services.h registry), 24: ctx.session/MatchService::session() is session::Session (net optional),
+// 25: asset::ModelCache without renderer parts (setGpu, render/ModelDraw.h draws models, terrain, scatter)
+inline constexpr u32 kApiVersion = 25;
 
 struct PlayOptions {
     bool bot = false;    // scripted input (automated tests)

@@ -12,6 +12,7 @@
 #include "mealkit/game/GameMain.h"
 
 #include "mealkit/asset/ModelCache.h"
+#include "mealkit/render/ModelDraw.h"
 #if MEALKIT_DEBUG_UI
 #include "mealkit/debug/DebugDrawRender.h"
 #endif
@@ -251,7 +252,8 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
                         userDataDirectory() + "/" + module.name + "/cache"}))
         MEALKIT_FATAL("Renderer initialization failed.\n%s", renderer.initError());
     asset::ModelCache models;
-    models.setRenderer(&renderer);
+    render::ModelUploader modelUploader(renderer);
+    models.setGpu(&modelUploader);
 
     // Match data (same function as headless/editor play): project settings (next to the exe for shipping, the project folder's mealkit.project during development),
     // scene, tuning, content hash. The executable + this hash must match to connect
