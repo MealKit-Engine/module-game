@@ -53,7 +53,9 @@ MEALKIT_STRUCT(ProjectSettings) {
     MEALKIT_VIEW_FIELD(bool, exportVersionFolder, false, "Put the version in the export folder name (export/<name>-<version>)");
     // Shown by the project manager. Choosing an image for the icon in the manager copies it as a PNG into the project folder
     MEALKIT_VIEW_FIELD(std::string, icon, "icon.png", "Game icon (PNG, project folder)");
-    MEALKIT_FIELD_FLAGS(std::string, templateName, {}, "Project template it was made from (arena, empty)",
+    // 2D game (side view on the XY plane): the editor's scene view opens orthographic, looking along +z, without rotating
+    MEALKIT_VIEW_FIELD(bool, view2d, false, "2D game (the editor shows the XY plane from the front, orthographic)");
+    MEALKIT_FIELD_FLAGS(std::string, templateName, {}, "Project template it was made from (arena, empty, empty2d, coop)",
                         reflect::kFieldView | reflect::kFieldReadOnly);
     MEALKIT_FIELD_FLAGS(std::string, created, {}, "Development started (YYYY-MM-DD)",
                         reflect::kFieldView | reflect::kFieldReadOnly);
