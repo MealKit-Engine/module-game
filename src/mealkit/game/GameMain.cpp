@@ -421,6 +421,9 @@ int runGame(MatchOptions opt, const WindowOptions& win, const GameMainSpec& spec
     // View-side services: input actions (assets/input.bindings + keys rebound by the player), string tables, game UI, player settings, view tuning.
     // Automated runs (--exit-tick) use default settings and don't save (so this PC's settings don't change test results; window size from the command line)
     Frontend front;
+#if MEALKIT_LIVE
+    ui::addLiveService(liveServer, [&front] { return &front.ui(); }); // MkUI Designer: open screens and their view-model values
+#endif
     {
         FrontendConfig c;
         c.renderer = &renderer;
