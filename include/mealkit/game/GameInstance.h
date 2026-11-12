@@ -1,5 +1,6 @@
 #pragma once
 
+#include "mealkit/render/Fwd.h"
 #include "mealkit/core/Reflect.h"
 #include "mealkit/core/Types.h"
 #include "mealkit/game/BuildInfo.h"
@@ -12,9 +13,6 @@
 #include <vector>
 
 namespace mealkit {
-namespace render {
-class DrawList;
-}
 namespace physics {
 class PhysicsWorld;
 }
