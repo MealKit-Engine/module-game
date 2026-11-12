@@ -126,6 +126,16 @@ int runHeadless(int argc, char** argv) {
         printGameUsage(nullptr, true);
         return 1;
     }
+    if (options.writeKinds) {
+        if (projectRoot().empty()) {
+            MEALKIT_ERROR("--write-kinds: no project folder");
+            return 1;
+        }
+        const std::string path = projectRoot() + "/build/editor/kinds.txt";
+        if (!scene::writeObjectKinds(path, &reflect::moduleObjectTypes())) return 1;
+        std::printf("Wrote %s\n", path.c_str());
+        return 0;
+    }
     MEALKIT_INFO("CPU: %s", cpuName().c_str()); // for recording determinism on other PCs
     GameTypes types;
     types.objectTypes = &reflect::moduleObjectTypes();

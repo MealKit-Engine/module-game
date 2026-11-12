@@ -38,6 +38,7 @@ struct MatchOptions {
     std::string replayInputsPath; // headless --replay-inputs (hash comparison), windowed --replay (viewing)
     std::string testPath;         // headless --test: scenario file (game/Scenario.h)
     bool finalState = false;      // --final-state: print the numbers of the state at the last tick ("STATE path value")
+    bool writeKinds = false;      // --write-kinds: write build/editor/kinds.txt (object kinds for MkRender) and exit
     bool updateExpected = false;  // --update-expected: rewrite the scenario's == values with the results
 };
 using HeadlessOptions = MatchOptions; // old name (defaults of game headless classes)
