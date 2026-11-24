@@ -98,6 +98,21 @@ struct GameContext {
     }
 };
 
+// Adding or removing a GameContext member breaks this declaration on purpose: add the service to ContextServices below (and to the
+// held list in MealKit/tools/check_context_access.ps1), then update the names below. 10 services + 6 per-frame values (+1 service with audio).
+namespace detail {
+[[maybe_unused]] inline void checkGameContextMembers(GameContext& c) {
+#if MEALKIT_HAS_AUDIO
+    auto& [m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16, m17] = c;
+    (void)m1; (void)m17;
+#else
+    auto& [m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16] = c;
+    (void)m1; (void)m16;
+#endif
+    (void)m2; (void)m3; (void)m4; (void)m5; (void)m6; (void)m7; (void)m8; (void)m9; (void)m10; (void)m11; (void)m12; (void)m13; (void)m14; (void)m15;
+}
+} // namespace detail
+
 // Provides every GameContext member as a service for one scope (game exe main, editor play session), so code that has no
 // GameContext (engine modules, tools) finds them with services::get<T>(). Withdrawn in reverse order when the scope ends.
 class ContextServices {
