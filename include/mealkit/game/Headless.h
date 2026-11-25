@@ -7,6 +7,7 @@
 #include "mealkit/game/BuildInfo.h"
 #include "mealkit/game/GameData.h"
 #include "mealkit/game/GameOptions.h"
+#include "mealkit/game/Gym.h"
 #include "mealkit/game/InputRecord.h"
 #include "mealkit/game/DesyncDump.h"
 #include "mealkit/game/ProjectSettings.h"
@@ -44,6 +45,7 @@
 //   static session::PlayerInput botInput(u32 tick, u8 player);            // --bot input (GameSession uses the same function)
 //   static void botCommands(u32 tick, u8 player, session::Session&); // (optional) --bot confirmed commands (mealkit/sim/Commands.h)
 //   static void botLoadout(u8 player, session::Session&);       // (optional) bot match start data (mealkit/game/Loadout.h)
+//   static ... gymAction/gymObserve/gymReward/gymDone  // (optional) --gym learning-agent environment (game/Gym.h)
 //   static void defaults(game::MatchOptions&, const ProjectSettingsType&); // (optional) port/player count/match data defaults
 namespace mealkit::game {
 
@@ -184,6 +186,7 @@ int runHeadless(int argc, char** argv) {
     }
     if (!options.replayInputsPath.empty())
         return replayHeadless<World>(options, data.contentHash, start, scenario.get());
+    if (options.gym) return gym::run<Game, World>(options, start);
     if (options.exitTick == 0) {
         MEALKIT_ERROR("Headless runs need --exit-tick <t> (or --replay-inputs <file>)");
         return 1;

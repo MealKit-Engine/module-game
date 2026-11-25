@@ -42,7 +42,8 @@ void printGameUsage(const char* name, bool headless) {
                     "  --test <file>          run a scenario test (tests/*.scenario) and check state values\n"
                     "  --update-expected      with --test: rewrite the == values in the file with the current results\n"
                     "  --write-kinds          write build/editor/kinds.txt (object kinds for MkRender) and exit\n"
-                    "  --final-state          print the state numbers at the last tick (STATE path value)\n");
+                    "  --final-state          print the state numbers at the last tick (STATE path value)\n"
+                    "  --gym                  learning-agent environment: JSON lines on stdin/stdout (reset/step/close, game/Gym.h)\n");
     std::printf("  --any-build            host: accept peers running a different build (compiler comparison tests)\n"
                 "  --net-lag <ms>         add round-trip time to this process's connection (testing)\n"
                 "  --net-jitter <ms>      vary each packet's delay by up to this much (testing)\n"
@@ -122,6 +123,7 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
         else if (a == "--update-expected" && headless) o.updateExpected = true;
         else if (a == "--write-kinds" && headless) o.writeKinds = true;
         else if (a == "--final-state" && headless) o.finalState = true;
+        else if (a == "--gym" && headless) o.gym = true;
         else if (a == "--any-build") o.anyBuild = true;
         else if (a == "--net-lag" && next(v)) o.netLagMs = static_cast<f32>(std::atof(v));
         else if (a == "--net-jitter" && next(v)) o.netJitterMs = static_cast<f32>(std::atof(v));
