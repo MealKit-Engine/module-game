@@ -13,7 +13,8 @@ bool startHeadlessSession(HeadlessSession& session, const MatchOptions& o, u64 s
     case MatchOptions::Mode::Offline: return session.startOffline(seed, o.matchData);
 #if MEALKIT_HAS_NET
     case MatchOptions::Mode::Host:
-        if (!session.host(o.port, o.maxPlayers, o.inputDelay, o.loopbackOnly)) {
+        if (!(o.dedicated ? session.hostDedicated(o.port, o.maxPlayers, o.inputDelay, o.loopbackOnly)
+                          : session.host(o.port, o.maxPlayers, o.inputDelay, o.loopbackOnly))) {
             MEALKIT_ERROR("Could not host on port %u", o.port);
             return false;
         }

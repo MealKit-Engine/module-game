@@ -21,6 +21,7 @@ void printGameUsage(const char* name, bool headless) {
     std::printf("  --local                host on 127.0.0.1 only (same-PC testing)\n"
                 "  --players <n>          max players when hosting (default: the game's default, max 8)\n"
                 "  --auto-start <n>       host: start when n players are in the lobby%s\n"
+                "%s"
                 "  --match-data <n>       match setting chosen by the host and sent to everyone (the game decides; alias --bodies)\n"
                 "  --delay <ms>           fixed input delay in milliseconds (default: automatic from the players' ping, mealkit.project)\n"
                 "  --seed <n>             world seed\n"
@@ -36,7 +37,11 @@ void printGameUsage(const char* name, bool headless) {
                 "  --desync-test <t>      nudge the physics before tick t to cause a desync (dumps go to build/desync)\n"
                 "  --record-inputs <file> save the confirmed inputs and hashes of every tick\n"
                 "  --modules              list the engine modules built into this executable, in dependency order\n",
-                headless ? " (default: --players)" : "", headless ? " (required unless replaying)" : "");
+                headless ? " (default: --players)" : "",
+                headless ? "  --dedicated            host a dedicated server: it holds slot 0 without playing, --players counts clients (max 7), --auto-start is the minimum\n"
+                           "                         that starts the match, one match per process (exits when the last client leaves)\n"
+                         : "",
+                headless ? " (required unless replaying or --dedicated)" : "");
     if (headless)
         std::printf("  --replay-inputs <file> replay a recorded match and compare every tick hash (no network)\n"
                     "  --test <file>          run a scenario test (tests/*.scenario) and check state values\n"
@@ -104,6 +109,7 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
         } else if (a == "--local") o.loopbackOnly = true;
         else if (a == "--players" && next(v)) o.maxPlayers = u32Of(v);
         else if (a == "--auto-start" && next(v)) o.autoStart = u32Of(v);
+        else if (a == "--dedicated" && headless) o.dedicated = true, o.mode = MatchOptions::Mode::Host;
         else if ((a == "--match-data" || a == "--bodies") && next(v)) o.matchData = u32Of(v);
         else if (a == "--delay" && next(v)) o.inputDelayMs = u32Of(v), o.delayGiven = true;
         else if (a == "--seed" && next(v)) o.seed = std::strtoull(v, nullptr, 10);

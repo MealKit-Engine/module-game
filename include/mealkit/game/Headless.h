@@ -187,7 +187,7 @@ int runHeadless(int argc, char** argv) {
     if (!options.replayInputsPath.empty())
         return replayHeadless<World>(options, data.contentHash, start, scenario.get());
     if (options.gym) return gym::run<Game, World>(options, start);
-    if (options.exitTick == 0) {
+    if (options.exitTick == 0 && !options.dedicated) {
         MEALKIT_ERROR("Headless runs need --exit-tick <t> (or --replay-inputs <file>)");
         return 1;
     }
@@ -211,6 +211,7 @@ int runHeadless(int argc, char** argv) {
 #endif
     const u64 seed = options.seed ? options.seed : static_cast<u64>(std::time(nullptr));
     auto loadout = [&] {
+        if (options.dedicated) return; // the server plays nobody
         if constexpr (requires { Game::botLoadout(u8{0}, session); }) Game::botLoadout(session.localPlayer(), session);
     };
     loadout(); // solo starts right when the session opens, so before that
@@ -231,7 +232,10 @@ int runHeadless(int argc, char** argv) {
     const bool offline = options.mode == MatchOptions::Mode::Offline;
     // Solo runs without rest. With networking, sleeps 1ms only when no tick advanced this iteration (waiting for input).
     // Busy waiting would steal time from the physics worker threads of multiple peers on PCs with few cores (CI runners).
+    // Dedicated server (docs/DECISIONS.md 2026-11-25): starts by itself once the minimum has joined, one match per process
+    // (exits when the match is running and the last client has left; --exit-tick still ends it earlier)
     const u32 autoStart = options.autoStart ? options.autoStart : options.maxPlayers;
+    bool clientSeen = false;
     const f64 frameDt = static_cast<f64>(tickDt()) * Simulation<World>::kCatchUpTicks; // catch up as much as possible at once
     int exitCode = 0;
     u32 scenarioTick = 0; // ticks executed (onTick runs once per tick, from tick 0)
@@ -243,6 +247,15 @@ int runHeadless(int argc, char** argv) {
         if (session.state() == session::SessionState::Lobby) loadout();
         if (session.isHost() && session.state() == session::SessionState::Lobby && session.lobbyPlayerCount() >= autoStart)
             session.startMatch(seed, options.matchData);
+        if (options.dedicated && sim.started() && exitDeadline == 0.0) {
+            const bool anyClient = (session.connectedMask() & ~1u) != 0;
+            clientSeen = clientSeen || anyClient;
+            if (clientSeen && !anyClient) {
+                MEALKIT_INFO("Dedicated server: the last client left, closing the match");
+                std::fflush(stdout);
+                break;
+            }
+        }
         if (session.state() == session::SessionState::Ended && exitDeadline == 0.0) {
             MEALKIT_ERROR("Session ended before the exit tick: %s", session.endReason());
             exitCode = 3;
@@ -259,6 +272,7 @@ int runHeadless(int argc, char** argv) {
         sim.update(
             session, frameDt,
             [&](u32 tick) {
+                if (options.dedicated) return session::PlayerInput{}; // the session ignores it: the server has no input
                 if constexpr (requires { Game::botCommands(tick, session.localPlayer(), session); })
                     Game::botCommands(tick, session.localPlayer(), session);
                 return Game::botInput(tick, session.localPlayer());

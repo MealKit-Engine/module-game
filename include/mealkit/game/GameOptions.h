@@ -20,6 +20,7 @@ struct MatchOptions {
     bool loopbackOnly = false; // 127.0.0.1 only (same-PC tests, no firewall prompt)
     u32 maxPlayers = 0;     // 0 = game defaults()
     u32 autoStart = 0;      // host: start when this many players gather (headless 0 = maxPlayers)
+    bool dedicated = false; // --dedicated (headless host): a server that holds slot 0 without playing; --players counts clients (max 7), --auto-start is the minimum that starts the match
     u32 matchData = 0;      // match setting decided by the game (set by the host and sent to everyone. sandbox: box count, 0 = scene)
     u32 inputDelayMs = 100; // --delay <ms>: fixed if given, otherwise auto adjustment from project settings (this is the initial value)
     u32 inputDelay = 3;     // ticks (set from inputDelayMs and the tick rate after reading the project)
