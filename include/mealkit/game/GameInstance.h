@@ -36,8 +36,9 @@ namespace mealkit::game {
 // 20: screen flow (GameContext::match, GameInstance::menus/stop, lobby names/ready/chat), 21: GameModule::build (build info),
 // 22: GameInstance::physics (sound occlusion rays), 23: GameContext::get (core/Services.h registry), 24: ctx.session/MatchService::session() is session::Session (net optional),
 // 25: asset::ModelCache without renderer parts (setGpu, render/ModelDraw.h draws models, terrain, scatter),
-// 26: MatchService::quit (the game's [Quit]: the exe closes its window, editor play stops)
-inline constexpr u32 kApiVersion = 26;
+// 26: MatchService::quit (the game's [Quit]: the exe closes its window, editor play stops),
+// 27: reflect::TypeInfo::validate (types the game DLL hands the editor grew a field; source compatible, rebuild only)
+inline constexpr u32 kApiVersion = 27;
 
 struct PlayOptions {
     bool bot = false;    // scripted input (automated tests)
