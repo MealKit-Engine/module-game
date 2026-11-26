@@ -218,6 +218,8 @@ int runGame(int argc, char** argv, const GameMainSpec& spec) {
         return 1;
     }
     if (!win.cookPath.empty()) return cookGame(win.cookPath) ? 0 : 1;
+    if (std::string error; win.packPath.empty() && !downloadGamePack(spec.module->name, error))
+        MEALKIT_FATAL("Cannot download the game data: %s", error.c_str()); // browser only
     mountGamePacks(win.packPath);
     if (win.systemInfo) return printSystemInfo();
     if (win.benchmarkSeconds > 0.0) { // benchmark: the same match every time (fixed seed + bots), no display sync, no sound
