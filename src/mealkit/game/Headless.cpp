@@ -1,6 +1,7 @@
 #include "mealkit/game/Headless.h"
 
 #if MEALKIT_HAS_NET
+#include "mealkit/net/Relay.h"
 #include "mealkit/platform/Socket.h"
 #endif
 #include "mealkit/platform/Paths.h"
@@ -8,7 +9,43 @@
 
 namespace mealkit::game {
 
+#if MEALKIT_HAS_NET
+namespace {
+
+// --relay: enters the room (waiting here, there is nothing else to do) and opens the session over it
+bool startRelaySession(HeadlessSession& session, const MatchOptions& o) {
+    net::RelayRoom room;
+    u64 code = 0;
+    if (o.mode == MatchOptions::Mode::Host) {
+        room.create(o.relayUrl, o.relayGame);
+    } else if (net::parseRoomCode(o.joinAddress, code)) {
+        room.join(o.relayUrl, code, o.relayGame);
+    } else {
+        MEALKIT_ERROR("--relay joins by room code, not '%s'", o.joinAddress.c_str());
+        return false;
+    }
+    const f64 deadline = nowSeconds() + 15.0;
+    while (room.state() == net::RelayRoom::State::Connecting && nowSeconds() < deadline) {
+        room.update();
+        sleepSeconds(0.001);
+    }
+    if (room.state() != net::RelayRoom::State::InRoom) {
+        MEALKIT_ERROR("Could not enter a room on the relay %s", o.relayUrl.c_str());
+        return false;
+    }
+    // The transport keeps the connection after the room object goes
+    return room.isOwner() ? session.hostWith(room.createTransport(), o.maxPlayers, o.inputDelay)
+                          : session.joinWith(room.createTransport(), room.ownerAddress());
+}
+
+} // namespace
+#endif
+
 bool startHeadlessSession(HeadlessSession& session, const MatchOptions& o, u64 seed) {
+#if MEALKIT_HAS_NET
+    if (!o.relayUrl.empty() && !o.dedicated && (o.mode == MatchOptions::Mode::Host || o.mode == MatchOptions::Mode::Join))
+        return startRelaySession(session, o);
+#endif
     switch (o.mode) {
     case MatchOptions::Mode::Offline: return session.startOffline(seed, o.matchData);
 #if MEALKIT_HAS_NET

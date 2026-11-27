@@ -46,9 +46,21 @@ MEALKIT_STRUCT(ProjectSettings) {
     // Game version: shown in the window title, title screen, and lobby, and part of the simulation version (at build time; no connecting with other versions)
     MEALKIT_VIEW_FIELD(std::string, version, "0.1.0", "Game version (shown to players, compared when joining)");
     // Pack files (game/Cook.h): the cook step starts from the start scene and these scenes, follows references, and packs only what's reached.
+    // packFolders are the game's own data outside assets/ (opened by project path, e.g. findAsset("content")): every file goes in as it is.
     // Assets opened only by a path in code go in packInclude (files or folders under assets; the cook warns about code paths it didn't reach)
     MEALKIT_VIEW_FIELD(std::string, scenes, {}, "Other scenes to ship (under assets, separated by spaces)");
     MEALKIT_VIEW_FIELD(std::string, packInclude, {}, "Always put in the pack (files or folders under assets, separated by spaces)");
+    MEALKIT_VIEW_FIELD(std::string, packFolders, {}, "Project folders outside assets to pack as they are (separated by spaces)");
+    // Browser cook (--cook-web): PNGs under these get half the pixels per side; sprites still report the original size (render/Sprites.h)
+    MEALKIT_VIEW_FIELD(std::string, webHalfTextures, {}, "Browser build: PNG folders or files under assets packed at half size (separated by spaces)");
+    // Browser cook: asset folders whose files go in chunk files downloaded after the game starts (game/Cook.h, platform/Pack.h)
+    MEALKIT_VIEW_FIELD(std::string, webChunks, {},
+                       "Browser build: asset folders downloaded after the game starts, in this order; folder/* makes one per subfolder, "
+                       "subfolders of the same name share one (separated by spaces)");
+    // Relay multiplayer (net/Relay.h): the relay server players meet at (the engine's tools/relay.py). A desktop build with an
+    // address hosts its rooms there too (browser and desktop players meet), and still joins IP addresses directly
+    MEALKIT_VIEW_FIELD(std::string, relayUrl, {}, "Browser build: multiplayer relay server (wss://host:port)");
+    MEALKIT_VIEW_FIELD(std::string, relayNativeUrl, {}, "Desktop builds: the same relay server without TLS (ws://host:port)");
     MEALKIT_VIEW_FIELD(std::string, sharedBuildFolder, {}, "Shared folder for built game code (PCs without a compiler get it from here)");
     MEALKIT_VIEW_FIELD(bool, exportVersionFolder, false, "Put the version in the export folder name (export/<name>-<version>)");
     // Shown by the project manager. Choosing an image for the icon in the manager copies it as a PNG into the project folder

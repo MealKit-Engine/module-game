@@ -15,7 +15,9 @@ namespace mealkit::game {
 struct MatchOptions {
     enum class Mode { Offline, Host, Join, SteamHost, SteamJoin } mode = Mode::Offline;
     u16 port = 0; // 0 = game defaults() (usually game.defaultPort in mealkit.project)
-    std::string joinAddress;
+    std::string joinAddress; // or a relay room code (net/Relay.h)
+    std::string relayUrl;    // --relay <ws://host:port>: host and join codes through this relay (desktop; over game.relayNativeUrl)
+    std::string relayGame;   // headless: the game's name on the relay (filled from the project)
     u64 steamLobby = 0;     // SteamJoin: lobby id
     bool loopbackOnly = false; // 127.0.0.1 only (same-PC tests, no firewall prompt)
     u32 maxPlayers = 0;     // 0 = game defaults()
@@ -70,6 +72,7 @@ struct WindowOptions {
     f64 benchmarkSeconds = 0.0; // --benchmark [seconds]: benchmark mode if not 0 (mealkit/game/Benchmark.h)
     std::string benchmarkPath = "benchmark.txt";
     std::string cookPath; // --cook: write the shipping pack and exit (game/Cook.h)
+    bool cookWeb = false; // --cook-web: cook for the browser (smaller audio and textures, game/Cook.h)
     std::string packPath; // --pack: mount this pack instead of the *.pak next to the exe (play the cooked game in a dev build)
 };
 

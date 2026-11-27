@@ -9,15 +9,24 @@
 // fixed name or folder (tables, tuning, input bindings, sound events, feedback, effects, UI, strings, fonts). From there references are
 // followed: any word in a text asset that is the path of an existing asset (scene → models, prefabs, terrain, HDRI, probes; sounds.events
 // → clips; .ui → images; cutscenes.table → camera glTF). Only what's reached is packed; there's no "whole folder" like Unity's Resources.
+// The project's `packFolders` (folders outside assets/ the game reads itself) go in whole, and assets their text files name are reached.
 // String literals in the game's source code that name an existing asset the cook didn't reach are warned about (add them to packInclude).
 //
 // How: glTF → .mkmodel (+ .mkcam for cameras), .hdr → .mkenv (asset/Cooked.h), the rest as is, all LZ4 in the pack (platform/Pack.h).
 // mealkit.project goes in too (without the engine/engineVersion lines that hold dev PC paths). Next to the pack, <out.pak>.txt has the
 // content hash and the file list (MealKitExport.cmake writes the hash into build.txt).
+//
+// web (--cook-web, the browser export): the pack is downloaded before the game starts, so it's cooked smaller. Plain PCM/float WAVs
+// become IMA ADPCM at 24 kHz or less (about 1/8, same path; miniaudio decodes it), and PNGs under the project's `webHalfTextures`
+// get half the pixels per side with their original size in a PNG chunk that render::SpriteTextures reports (render/Sprites.h).
+// Files under the project's `webChunks` folders go in chunk files beside the pack (platform/Pack.h "Chunks"): the page starts
+// after the pack alone and downloads the chunks while the game runs. "folder" is one chunk; "folder/*" is one per subfolder
+// (files directly in it stay in the pack), and subfolders of the same name share one, so "textures/characters/* sounds/characters/*"
+// puts each character's pictures and sounds together. Chunks are numbered in the order listed, and download in that order.
 namespace mealkit::game {
 
 // false if the project can't be read or the pack can't be written (missing referenced files are warnings). Only in builds with
 // MEALKIT_ASSET_IMPORT (dev builds); elsewhere it returns false with a message
-bool cookGame(const std::string& outPack);
+bool cookGame(const std::string& outPack, bool web = false);
 
 } // namespace mealkit::game

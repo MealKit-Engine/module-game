@@ -14,7 +14,8 @@ void printGameUsage(const char* name, bool headless) {
     else std::printf("%s (MealKit %s)\n", name, MEALKIT_VERSION);
     std::printf("Match:\n"
                 "  --host [port]          host a match (default: the game's default port, game.defaultPort in mealkit.project)\n"
-                "  --join <addr[:port]>   join a host\n");
+                "  --join <addr[:port]>   join a host (or, with a relay, a six-digit room code)\n"
+                "  --relay <ws://..>      host and join rooms on a relay server (tools/relay.py; default game.relayNativeUrl)\n");
     if (!headless)
         std::printf("  --steam                host a Steam friends-only lobby (invite with I or Shift+Tab)\n"
                     "  --steam-join <lobby>   join a Steam lobby by id (invites from Steam join automatically)\n");
@@ -77,6 +78,7 @@ void printGameUsage(const char* name, bool headless) {
                 "  --benchmark [seconds]  fixed seed, bot input, vsync off: measure 30 s after a 3 s warm-up, write benchmark.txt, exit\n"
                 "  --benchmark-out <txt>  benchmark report path (default benchmark.txt)\n"
                 "  --cook <out.pak>       cook the assets the game reaches into a pack and exit (development builds; build.bat Export runs it)\n"
+                "  --cook-web             with --cook: cook for the browser (ADPCM audio, webHalfTextures at half size)\n"
                 "  --pack <file.pak>      play from this pack instead of the assets folder (default: the .pak next to the exe)\n"
                 "  --headless --help      run without a window (headless options, replay)\n");
 }
@@ -106,7 +108,8 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
         else if ((a == "--steam-join" || a == "+connect_lobby") && !headless && next(v)) { // +connect_lobby: accepting a Steam invite
             o.mode = MatchOptions::Mode::SteamJoin;
             o.steamLobby = std::strtoull(v, nullptr, 10);
-        } else if (a == "--local") o.loopbackOnly = true;
+        } else if (a == "--relay" && next(v)) o.relayUrl = v;
+        else if (a == "--local") o.loopbackOnly = true;
         else if (a == "--players" && next(v)) o.maxPlayers = u32Of(v);
         else if (a == "--auto-start" && next(v)) o.autoStart = u32Of(v);
         else if (a == "--dedicated" && headless) o.dedicated = true, o.mode = MatchOptions::Mode::Host;
@@ -177,6 +180,7 @@ bool parseGameArgs(int argc, char** argv, MatchOptions& o, WindowOptions* window
             if (i + 1 < argc && argv[i + 1][0] != '-') w.benchmarkSeconds = std::max(1.0, std::atof(argv[++i]));
         } else if (a == "--benchmark-out" && next(v)) w.benchmarkPath = v;
         else if (a == "--cook" && next(v)) w.cookPath = v;
+        else if (a == "--cook-web") w.cookWeb = true;
         else if (a == "--pack" && next(v)) w.packPath = v;
         else if (a == "--modules") { // engine modules in this build (core/Modules.h), then exit
             logEngineModules();

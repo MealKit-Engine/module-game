@@ -6,12 +6,24 @@
 #if MEALKIT_HAS_NET
 #include "mealkit/online/Online.h"
 #include "mealkit/platform/Socket.h"
+#include "mealkit/platform/WebSocket.h"
 #endif
 
 #include <algorithm>
 #include <ctime>
 
 namespace mealkit::game {
+
+#if MEALKIT_HAS_NET
+namespace {
+#ifdef __EMSCRIPTEN__
+constexpr bool kBrowser = true; // no UDP: relay rooms only
+#else
+constexpr bool kBrowser = false;
+#endif
+constexpr const char* kNoRelay = "No relay server for multiplayer (game.relayUrl in mealkit.project)";
+} // namespace
+#endif
 
 MatchService::~MatchService() { shutdown(); }
 
@@ -39,6 +51,7 @@ void MatchService::init(const MatchServiceConfig& config) {
     m_local.setLocalName(name);
     m_active.setTarget(m_local);
     m_error.clear();
+    m_relayFailed = false;
 }
 
 void MatchService::resetSessions() {
@@ -80,7 +93,7 @@ u64 MatchService::nextSeed() {
 bool MatchService::playOffline() {
     if (m_active.state() != session::SessionState::Idle) return false;
     m_error.clear();
-    m_online = false;
+    m_online = m_relayFailed = false;
     m_active.setTarget(m_local);
     return m_local.openOffline();
 }
@@ -96,9 +109,15 @@ bool MatchService::playReplay(const InputRecording& recording) {
 
 #if MEALKIT_HAS_NET
 bool MatchService::host(u16 port, u32 maxPlayers) {
+    if (!m_config.relayUrl.empty()) return hostRelay(maxPlayers);
+    return hostDirect(port, maxPlayers);
+}
+
+bool MatchService::hostDirect(u16 port, u32 maxPlayers) {
     if (m_active.state() != session::SessionState::Idle) return false;
+    if (kBrowser) return fail(kNoRelay);
     m_error.clear();
-    m_online = false;
+    m_online = m_relayFailed = false;
     useNetwork();
     m_port = port ? port : m_config.defaultPort;
     m_maxPlayers = maxPlayers ? maxPlayers : m_config.defaultMaxPlayers;
@@ -111,6 +130,7 @@ bool MatchService::host(u16 port, u32 maxPlayers) {
 bool MatchService::hostOnline(u32 maxPlayers) {
     if (m_active.state() != session::SessionState::Idle || !onlineAvailable()) return false;
     m_error.clear();
+    m_relayFailed = false;
     m_online = true;
     m_onlineHost = true;
     useNetwork();
@@ -121,8 +141,13 @@ bool MatchService::hostOnline(u32 maxPlayers) {
 
 bool MatchService::join(const std::string& address) {
     if (m_active.state() != session::SessionState::Idle) return false;
+    // Digits with a relay configured: a room code (a desktop build takes only the relay's six, the rest stays an address)
+    u64 code = 0;
+    if (!m_config.relayUrl.empty() && net::parseRoomCode(address, code) && (kBrowser || address.size() == 6)) return joinRelay(code);
+    if (kBrowser)
+        return fail(m_config.relayUrl.empty() ? std::string(kNoRelay) : "Enter the room code (numbers only), not '" + address + "'");
     m_error.clear();
-    m_online = false;
+    m_online = m_relayFailed = false;
     useNetwork();
     net::Address to;
     const bool resolved = net::startup() && net::resolveAddress(address.c_str(), m_config.defaultPort, to);
@@ -135,11 +160,72 @@ bool MatchService::join(const std::string& address) {
 bool MatchService::joinOnline(u64 lobbyId) {
     if (m_active.state() != session::SessionState::Idle || !onlineAvailable()) return false;
     m_error.clear();
+    m_relayFailed = false;
     m_online = true;
     m_onlineHost = false;
     useNetwork();
     m_config.online->joinLobby(lobbyId);
     return true;
+}
+
+bool MatchService::hostRelay(u32 maxPlayers) {
+    if (m_active.state() != session::SessionState::Idle) return false;
+    m_error.clear();
+    m_online = m_relayFailed = false;
+    m_relayed = true;
+    useNetwork();
+    m_maxPlayers = maxPlayers ? maxPlayers : m_config.defaultMaxPlayers;
+    m_relay.create(m_config.relayUrl, m_config.gameName); // update opens the session once in the room
+    return true;
+}
+
+bool MatchService::joinRelay(u64 code) {
+    m_error.clear();
+    m_online = m_relayFailed = false;
+    m_relayed = true;
+    m_maxPlayers = 0; // joining
+    useNetwork();
+    m_relay.join(m_config.relayUrl, code, m_config.gameName);
+    return true;
+}
+
+u64 MatchService::roomCode() const { return m_relayed ? m_relay.code() : 0; }
+
+void MatchService::leaveRelay() {
+    // The room goes to the lockstep successor before the session sends its handoff (the transport keeps the connection until then)
+    if (m_relayed && m_net.isHost()) m_relay.setOwner(m_net.successorAddress().userId);
+    m_relay.leave();
+    m_relayed = false;
+    m_announcedCode = 0;
+}
+
+void MatchService::updateRelay() {
+    m_relay.update();
+    if (m_relayed && m_net.state() == session::SessionState::Idle) {
+        if (m_relay.state() == net::RelayRoom::State::Failed) {
+            // A wrong room code is the usual case: the game's message screen says so, not just the log
+            m_error = m_maxPlayers ? "Could not open a room on the relay server"
+                                   : "Could not join the room (wrong code, or the relay server cannot be reached)";
+            leaveRelay();
+            resetSessions();
+            m_relayFailed = true;
+        } else if (m_relay.state() == net::RelayRoom::State::InRoom) {
+            if (m_relay.isOwner()) m_net.hostWith(m_relay.createTransport(), m_maxPlayers, m_config.inputDelay);
+            else m_net.joinWith(m_relay.createTransport(), m_relay.ownerAddress());
+        }
+    }
+    m_net.update(m_now);
+    // After host migration: the room's owner is the lockstep host
+    if (m_relayed && m_relay.isOwner() && !m_net.isHost() && m_net.hostAddress().userId)
+        m_relay.setOwner(m_net.hostAddress().userId);
+    const u64 code = m_relayed && m_net.state() == session::SessionState::Lobby ? m_relay.code() : 0;
+    if (code != m_shownCode) {
+        net::showRoomCode(code); // over the web page; nothing on desktop
+        m_shownCode = code;
+    }
+    // Desktop: game screens needn't know about codes, so the host says it in the lobby chat
+    if (!kBrowser && code && m_net.isHost() && code != m_announcedCode && m_net.sendChat("Room code: " + std::to_string(code)))
+        m_announcedCode = code;
 }
 
 #else
@@ -148,6 +234,8 @@ bool MatchService::host(u16, u32) { return fail("This build has no multiplayer (
 bool MatchService::hostOnline(u32) { return false; }
 bool MatchService::join(const std::string&) { return fail("This build has no multiplayer (engine module net is off)"); }
 bool MatchService::joinOnline(u64) { return false; }
+bool MatchService::hostDirect(u16 port, u32 maxPlayers) { return host(port, maxPlayers); }
+u64 MatchService::roomCode() const { return 0; }
 #endif
 
 bool MatchService::start(u32 matchData) {
@@ -168,8 +256,9 @@ void MatchService::leave() {
         m_config.online->leaveLobby();
     }
     m_announcer.close();
+    leaveRelay();
 #endif
-    m_online = false;
+    m_online = m_relayFailed = false;
     resetSessions();
     m_error.clear();
 }
@@ -187,7 +276,9 @@ void MatchService::inviteFriends() {}
 
 MatchPhase MatchService::phase() const {
     switch (m_active.state()) {
-    case session::SessionState::Idle: return m_online ? MatchPhase::Opening : MatchPhase::Menu;
+    case session::SessionState::Idle:
+        if (m_relayFailed) return MatchPhase::Ended; // the game shows error() and calls leave
+        return m_online || m_relayed ? MatchPhase::Opening : MatchPhase::Menu;
     case session::SessionState::Connecting: return MatchPhase::Connecting;
     case session::SessionState::Lobby: return MatchPhase::Lobby;
     case session::SessionState::Running: return MatchPhase::Running;
@@ -210,7 +301,7 @@ u32 MatchService::slowPlayers() const {
 bool MatchService::browsing() const { return m_finder.isOpen(); }
 
 void MatchService::setBrowsing(bool on) {
-    if (on == m_finder.isOpen()) return;
+    if (on == m_finder.isOpen() || (on && kBrowser)) return; // no LAN search in a browser
     if (on) m_finder.open(m_config.gameName);
     else {
         m_finder.close();
@@ -250,7 +341,7 @@ void MatchService::update(f64 now) {
         }
     }
 
-    m_net.update(now);
+    updateRelay(); // also updates the network session
     if (m_active.state() == session::SessionState::Ended && m_error.empty()) m_error = m_active.endReason();
     // After host migration: if the platform chose me as lobby owner but the lockstep host is someone else, hand it to them
     if (m_online && online && online->isLobbyOwner() && !m_net.isHost() && m_net.hostAddress().userId)
@@ -305,6 +396,9 @@ void MatchService::shutdown() {
         m_config.online->leaveLobby();
     }
     m_online = false;
+    leaveRelay();
+    if (m_shownCode) net::showRoomCode(0);
+    m_shownCode = 0;
     m_announcer.close();
     m_finder.close();
     m_rooms.clear();

@@ -215,6 +215,10 @@ int runHeadless(int argc, char** argv) {
         if constexpr (requires { Game::botLoadout(u8{0}, session); }) Game::botLoadout(session.localPlayer(), session);
     };
     loadout(); // solo starts right when the session opens, so before that
+    options.relayGame = data.project.settings.name;
+#ifdef MEALKIT_GAME_NAME // the game's own targets (the same fallback as the window, whose module has the target's name)
+    if (options.relayGame.empty()) options.relayGame = MEALKIT_GAME_NAME;
+#endif
     if (!startHeadlessSession(session, options, seed)) return 1;
 
     PlayOptions play;
